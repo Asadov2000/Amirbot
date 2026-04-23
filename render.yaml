@@ -1,0 +1,97 @@
+services:
+  - type: keyvalue
+    name: amir-queue
+    region: frankfurt
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  - type: web
+    name: amir-bot
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: corepack enable && corepack prepare pnpm@10.12.4 --activate && pnpm install --frozen-lockfile && pnpm --filter @amir/bot build
+    startCommand: >
+      sh -lc 'export BOT_PUBLIC_BASE_URL="${BOT_PUBLIC_BASE_URL:-$RENDER_EXTERNAL_URL}";
+      pnpm --filter @amir/bot start'
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: APP_ENV
+        value: production
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Europe/Moscow
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        value: Amir_Status_bot
+      - key: BOT_TRANSPORT
+        value: auto
+      - key: BOT_WEBHOOK_PATH
+        value: /telegram/webhook
+      - key: BOT_WEBHOOK_SECRET
+        generateValue: true
+      - key: BOT_HTTP_PORT
+        value: "10000"
+      - key: BOT_INTERNAL_API_TOKEN
+        generateValue: true
+      - key: BOT_TIMEZONE
+        value: Europe/Moscow
+      - key: BOT_MINI_APP_SHORT_NAME
+        value: care
+      - key: BOT_DEFAULT_CHILD_NAME
+        value: Амир
+
+  - type: worker
+    name: amir-worker
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: corepack enable && corepack prepare pnpm@10.12.4 --activate && pnpm install --frozen-lockfile && pnpm --filter @amir/worker build
+    startCommand: >
+      sh -lc 'export BOT_INTERNAL_BASE_URL="${BOT_INTERNAL_BASE_URL:-http://$BOT_INTERNAL_HOSTPORT}";
+      pnpm --filter @amir/worker start'
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: APP_ENV
+        value: production
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Europe/Moscow
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: amir-queue
+          property: connectionString
+      - key: BOT_INTERNAL_HOSTPORT
+        fromService:
+          type: web
+          name: amir-bot
+          property: hostport
+      - key: BOT_INTERNAL_API_TOKEN
+        fromService:
+          type: web
+          name: amir-bot
+          envVarKey: BOT_INTERNAL_API_TOKEN
+      - key: WORKER_TIMEZONE
+        value: Europe/Moscow
+      - key: WORKER_HEALTH_PORT
+        value: "3030"
+
+databases:
+  - name: amir-db
+    region: frankfurt
+    plan: basic-256mb
+    postgresMajorVersion: "18"
+    databaseName: amir_family_care
+    user: amir

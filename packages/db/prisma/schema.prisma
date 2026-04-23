@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum FamilyMemberRole {
+  OWNER
+  PARTNER
+  CAREGIVER
+}
+
+enum ChildSex {
+  MALE
+  FEMALE
+  INTERSEX
+  UNSPECIFIED
+}
+
+enum CareEventType {
+  BREASTFEEDING
+  BOTTLE_FEEDING
+  SLEEP
+  DIAPER
+  TEMPERATURE
+  MEDICATION
+  NOTE
+}
+
+enum CareEventSource {
+  MANUAL
+  OFFLINE_SYNC
+  BOT
+  SYSTEM
+  IMPORT
+}
+
+enum BreastSide {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+enum FeedingSource {
+  BREAST_MILK
+  FORMULA
+  WATER
+  SOLIDS
+  OTHER
+}
+
+enum DiaperKind {
+  WET
+  DIRTY
+  MIXED
+  DRY_CHECK
+}
+
+enum TemperatureMethod {
+  AXILLARY
+  ORAL
+  RECTAL
+  EAR
+  FOREHEAD
+  OTHER
+}
+
+enum MedicationRoute {
+  ORAL
+  TOPICAL
+  NASAL
+  INHALATION
+  INJECTION
+  RECTAL
+  OTHER
+}
+
+enum ReminderType {
+  FEEDING
+  SLEEP
+  DIAPER
+  MEDICATION
+  TEMPERATURE
+  CUSTOM
+}
+
+enum ReminderStatus {
+  ACTIVE
+  PAUSED
+  DONE
+  CANCELLED
+}
+
+enum MedicationScheduleStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ExportFormat {
+  PDF
+  CSV
+}
+
+enum ExportScope {
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+enum ExportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  GENERATE
+  SYNC
+  SEND
+  COMPLETE
+  FAIL
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  WORKER
+  BOT
+}
+
+model User {
+  id                    String        @id @default(cuid())
+  telegramUserId        String?       @unique
+  firstName             String
+  lastName              String?
+  displayName           String
+  locale                String        @default("ru-RU")
+  timeZone              String        @default("Europe/Moscow")
+  status                UserStatus    @default(ACTIVE)
+  memberships           FamilyMember[]
+  createdCareEvents     CareEvent[]   @relation("CareEventsCreated")
+  updatedCareEvents     CareEvent[]   @relation("CareEventsUpdated")
+  remindersCreated      Reminder[]    @relation("RemindersCreated")
+  medicationSchedules   MedicationSchedule[] @relation("MedicationSchedulesCreated")
+  exportJobsRequested   ExportJob[]   @relation("ExportJobsRequested")
+  auditLogsActed        AuditLog[]    @relation("AuditLogsActor")
+  createdAt             DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @db.Timestamptz(3)
+  deletedAt             DateTime?     @db.Timestamptz(3)
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Family {
+  id                  String               @id @default(cuid())
+  name                String
+  timeZone            String               @default("Europe/Moscow")
+  memberships         FamilyMember[]
+  children            Child[]
+  careEvents          CareEvent[]
+  reminders           Reminder[]
+  medicationSchedules MedicationSchedule[]
+  dailySummaries      DailySummary[]
+  exportJobs          ExportJob[]
+  auditLogs           AuditLog[]
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  deletedAt           DateTime?            @db.Timestamptz(3)
+
+  @@index([deletedAt])
+  @@map("families")
+}
+
+model FamilyMember {
+  id        String           @id @default(cuid())
+  familyId  String
+  userId    String
+  role      FamilyMemberRole @default(PARTNER)
+  family    Family           @relation(fields: [familyId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime?        @db.Timestamptz(3)
+
+  @@unique([familyId, userId])
+  @@index([userId, deletedAt])
+  @@index([familyId, deletedAt])
+  @@map("family_members")
+}
+
+model Child {
+  id                  String               @id @default(cuid())
+  familyId            String
+  name                String
+  birthDate           DateTime             @db.Date
+  sex                 ChildSex             @default(UNSPECIFIED)
+  family              Family               @relation(fields: [familyId], references: [id])
+  careEvents          CareEvent[]
+  reminders           Reminder[]
+  medicationSchedules MedicationSchedule[]
+  dailySummaries      DailySummary[]
+  exportJobs          ExportJob[]
+  auditLogs           AuditLog[]
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  deletedAt           DateTime?            @db.Timestamptz(3)
+
+  @@index([familyId, deletedAt])
+  @@map("children")
+}
+
+model CareEvent {
+  id                   String            @id @default(cuid())
+  familyId             String
+  childId              String
+  createdByUserId      String
+  updatedByUserId      String?
+  type                 CareEventType
+  source               CareEventSource   @default(MANUAL)
+  idempotencyKey       String
+  occurredAt           DateTime          @db.Timestamptz(3)
+  startedAt            DateTime?         @db.Timestamptz(3)
+  endedAt              DateTime?         @db.Timestamptz(3)
+  note                 String?
+  payload              Json?
+  breastSide           BreastSide?
+  feedingSource        FeedingSource?
+  quantityMl           Int?
+  durationSeconds      Int?
+  diaperKind           DiaperKind?
+  temperatureC         Decimal?          @db.Decimal(4, 1)
+  temperatureMethod    TemperatureMethod?
+  medicationName       String?
+  medicationDose       Decimal?          @db.Decimal(10, 2)
+  medicationUnit       String?
+  medicationRoute      MedicationRoute?
+  reminderId           String?
+  medicationScheduleId String?
+  revision             Int               @default(1)
+  family               Family            @relation(fields: [familyId], references: [id])
+  child                Child             @relation(fields: [childId], references: [id])
+  createdBy            User              @relation("CareEventsCreated", fields: [createdByUserId], references: [id])
+  updatedBy            User?             @relation("CareEventsUpdated", fields: [updatedByUserId], references: [id])
+  reminder             Reminder?         @relation(fields: [reminderId], references: [id])
+  medicationSchedule   MedicationSchedule? @relation(fields: [medicationScheduleId], references: [id])
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  deletedAt            DateTime?         @db.Timestamptz(3)
+
+  @@unique([familyId, idempotencyKey])
+  @@index([familyId, childId, occurredAt])
+  @@index([createdByUserId, deletedAt])
+  @@index([reminderId])
+  @@index([medicationScheduleId])
+  @@map("care_events")
+}
+
+model Reminder {
+  id                 String         @id @default(cuid())
+  familyId           String
+  childId            String?
+  createdByUserId    String
+  type               ReminderType
+  status             ReminderStatus @default(ACTIVE)
+  title              String
+  message            String?
+  dueAt              DateTime       @db.Timestamptz(3)
+  nextTriggerAt      DateTime?      @db.Timestamptz(3)
+  lastTriggeredAt    DateTime?      @db.Timestamptz(3)
+  repeatEveryMinutes Int?
+  timeZone           String         @default("Europe/Moscow")
+  metadata           Json?
+  family             Family         @relation(fields: [familyId], references: [id])
+  child              Child?         @relation(fields: [childId], references: [id])
+  createdBy          User           @relation("RemindersCreated", fields: [createdByUserId], references: [id])
+  careEvents         CareEvent[]
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(3)
+  deletedAt          DateTime?      @db.Timestamptz(3)
+
+  @@index([familyId, status, nextTriggerAt])
+  @@index([childId, deletedAt])
+  @@map("reminders")
+}
+
+model MedicationSchedule {
+  id               String                   @id @default(cuid())
+  familyId         String
+  childId          String
+  createdByUserId  String
+  status           MedicationScheduleStatus @default(ACTIVE)
+  medicationName   String
+  dose             Decimal                  @db.Decimal(10, 2)
+  doseUnit         String
+  route            MedicationRoute
+  frequencyMinutes Int
+  startsAt         DateTime                 @db.Timestamptz(3)
+  endsAt           DateTime?                @db.Timestamptz(3)
+  nextDoseAt       DateTime?                @db.Timestamptz(3)
+  lastDoseAt       DateTime?                @db.Timestamptz(3)
+  notes            String?
+  metadata         Json?
+  family           Family                   @relation(fields: [familyId], references: [id])
+  child            Child                    @relation(fields: [childId], references: [id])
+  createdBy        User                     @relation("MedicationSchedulesCreated", fields: [createdByUserId], references: [id])
+  careEvents       CareEvent[]
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
+  deletedAt        DateTime?                @db.Timestamptz(3)
+
+  @@index([familyId, status, nextDoseAt])
+  @@index([childId, deletedAt])
+  @@map("medication_schedules")
+}
+
+model DailySummary {
+  id                            String    @id @default(cuid())
+  familyId                      String
+  childId                       String
+  summaryDate                   DateTime  @db.Date
+  timeZone                      String
+  feedingsCount                 Int       @default(0)
+  breastfeedingCount            Int       @default(0)
+  bottleFeedingsCount           Int       @default(0)
+  totalBottleMl                 Int       @default(0)
+  sleepSessionsCount            Int       @default(0)
+  totalSleepMinutes             Int       @default(0)
+  averageFeedingIntervalMinutes Int?
+  wetDiapersCount               Int       @default(0)
+  dirtyDiapersCount             Int       @default(0)
+  mixedDiapersCount             Int       @default(0)
+  dryChecksCount                Int       @default(0)
+  temperatureReadingsCount      Int       @default(0)
+  maxTemperatureC               Decimal?  @db.Decimal(4, 1)
+  minTemperatureC               Decimal?  @db.Decimal(4, 1)
+  medicationsCount              Int       @default(0)
+  notesCount                    Int       @default(0)
+  payload                       Json?
+  generatedAt                   DateTime  @default(now()) @db.Timestamptz(3)
+  family                        Family    @relation(fields: [familyId], references: [id])
+  child                         Child     @relation(fields: [childId], references: [id])
+  createdAt                     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt                     DateTime? @db.Timestamptz(3)
+
+  @@unique([childId, summaryDate])
+  @@index([familyId, summaryDate])
+  @@map("daily_summaries")
+}
+
+model ExportJob {
+  id                String          @id @default(cuid())
+  familyId          String
+  childId           String?
+  requestedByUserId String
+  format            ExportFormat
+  scope             ExportScope
+  status            ExportJobStatus @default(PENDING)
+  rangeStart        DateTime        @db.Timestamptz(3)
+  rangeEnd          DateTime        @db.Timestamptz(3)
+  fileName          String?
+  fileUrl           String?
+  errorMessage      String?
+  parameters        Json?
+  family            Family          @relation(fields: [familyId], references: [id])
+  child             Child?          @relation(fields: [childId], references: [id])
+  requestedBy       User            @relation("ExportJobsRequested", fields: [requestedByUserId], references: [id])
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt         DateTime?       @db.Timestamptz(3)
+
+  @@index([familyId, status, createdAt])
+  @@index([childId, deletedAt])
+  @@map("export_jobs")
+}
+
+model AuditLog {
+  id         String         @id @default(cuid())
+  familyId   String?
+  childId    String?
+  actorUserId String?
+  actorType  AuditActorType @default(USER)
+  action     AuditAction
+  entityType String
+  entityId   String
+  changes    Json?
+  metadata   Json?
+  family     Family?        @relation(fields: [familyId], references: [id])
+  child      Child?         @relation(fields: [childId], references: [id])
+  actorUser  User?          @relation("AuditLogsActor", fields: [actorUserId], references: [id])
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  deletedAt  DateTime?      @db.Timestamptz(3)
+
+  @@index([familyId, createdAt])
+  @@index([childId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@map("audit_logs")
+}

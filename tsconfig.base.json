@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@amir/config/*": ["packages/config/src/*"],
+      "@amir/db/*": ["packages/db/src/*"],
+      "@amir/shared/*": ["packages/shared/src/*"],
+      "@amir/ui/*": ["packages/ui/src/*"]
+    }
+  }
+}

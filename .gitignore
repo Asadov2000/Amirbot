@@ -1,0 +1,16 @@
+node_modules
+.turbo
+.next
+dist
+build
+coverage
+.playwright-cli
+.env
+.env.*
+!.env.example
+prisma/dev.db
+generated
+out
+.vercel
+*.log
+*.tsbuildinfo

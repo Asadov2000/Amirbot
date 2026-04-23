@@ -1,0 +1,48 @@
+{
+  "name": "@amir/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./audit": {
+      "types": "./dist/audit.d.ts",
+      "import": "./dist/audit.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./repositories": {
+      "types": "./dist/repositories/index.d.ts",
+      "import": "./dist/repositories/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "db:generate": "pnpm exec prisma generate --schema prisma/schema.prisma",
+    "db:format": "pnpm exec prisma format --schema prisma/schema.prisma",
+    "db:migrate": "pnpm exec prisma migrate deploy --schema prisma/schema.prisma",
+    "build": "pnpm --filter @amir/shared run build && pnpm run db:generate && pnpm exec tsc -p tsconfig.json",
+    "lint": "pnpm run db:generate && pnpm exec tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm --filter @amir/shared run build && pnpm run db:generate && pnpm exec tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@amir/shared": "workspace:*",
+    "@prisma/client": "^6.19.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "prisma": "^6.19.3",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "amir-family-care",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 --if-present build",
+    "dev": "turbo run dev --parallel",
+    "lint": "pnpm -r --workspace-concurrency=1 --if-present lint",
+    "typecheck": "pnpm -r --workspace-concurrency=1 --if-present typecheck",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "db:generate": "pnpm --filter @amir/db db:generate",
+    "db:migrate": "pnpm --filter @amir/db db:migrate"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.3"
+  }
+}

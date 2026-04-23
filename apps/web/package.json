@@ -1,0 +1,29 @@
+{
+  "name": "@amir/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amir/db": "workspace:*",
+    "@amir/shared": "workspace:*",
+    "@amir/ui": "workspace:*",
+    "@telegram-apps/sdk": "^3.11.8",
+    "@telegram-apps/sdk-react": "^3.3.9",
+    "date-fns": "^4.1.0",
+    "next": "16.2.4",
+    "pdf-lib": "^1.17.1",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2"
+  }
+}
