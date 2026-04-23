@@ -1,4 +1,5 @@
 import { Bot, type Context } from "grammy";
+import { createHash } from "node:crypto";
 
 import { registerCommands } from "./bot/register-commands.js";
 import { loadBotConfig, resolveTransport, type BotConfig } from "./config.js";
@@ -76,15 +77,28 @@ export async function startBotApplication(
 
 async function configureWebhook(bot: Bot<Context>, config: BotConfig, logger: Logger): Promise<void> {
   const webhookUrl = `${config.publicBaseUrl}${config.webhookPath}`;
+  const webhookSecret = normalizeWebhookSecret(config.webhookSecret);
 
   await bot.api.setWebhook(webhookUrl, {
-    secret_token: config.webhookSecret,
+    secret_token: webhookSecret,
     allowed_updates: ["message", "callback_query"]
   });
 
   logger.info("Webhook configured", {
     webhookUrl
   });
+}
+
+function normalizeWebhookSecret(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (/^[A-Za-z0-9_-]{1,256}$/.test(value)) {
+    return value;
+  }
+
+  return createHash("sha256").update(value).digest("hex");
 }
 
 async function configurePolling(bot: Bot<Context>, logger: Logger): Promise<void> {
