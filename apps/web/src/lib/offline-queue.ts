@@ -52,6 +52,18 @@ export function upsertLocalEvent(event: CareEventRecord): CareEventRecord[] {
   return next;
 }
 
+export function removeLocalEvent(eventId: string): CareEventRecord[] {
+  const next = getLocalEvents().filter((item) => item.id !== eventId);
+  saveLocalEvents(next);
+  return next;
+}
+
+export function replaceLocalEvent(localEventId: string, serverEvent: CareEventRecord): CareEventRecord[] {
+  const next = [serverEvent, ...getLocalEvents().filter((item) => item.id !== localEventId && item.id !== serverEvent.id)];
+  saveLocalEvents(next);
+  return next;
+}
+
 export function getPendingEvents(): CareEventRecord[] {
   return readJson<CareEventRecord[]>(PENDING_EVENTS_KEY, []);
 }
@@ -84,6 +96,13 @@ export function saveEventOverride(event: CareEventRecord): Record<string, Partia
       source: "local" as const,
     },
   };
+  writeJson(OVERRIDES_KEY, next);
+  return next;
+}
+
+export function removeEventOverride(eventId: string): Record<string, Partial<CareEventRecord>> {
+  const next = { ...getEventOverrides() };
+  delete next[eventId];
   writeJson(OVERRIDES_KEY, next);
   return next;
 }

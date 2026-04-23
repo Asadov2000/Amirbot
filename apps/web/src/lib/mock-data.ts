@@ -13,108 +13,13 @@ function createId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
-function nowMinus(minutes: number): string {
-  return new Date(Date.now() - minutes * 60_000).toISOString();
-}
-
 function todayStart(): number {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 }
 
 function baseEvents(): CareEventRecord[] {
-  const events: CareEventRecord[] = [
-    {
-      id: "evt_feed_1",
-      idempotencyKey: "seed_feed_1",
-      kind: "FEEDING",
-      actor: "mom",
-      occurredAt: nowMinus(95),
-      summary: "Грудь — 18 мин",
-      payload: { mode: "BREAST", durationMinutes: 18 },
-      status: "COMPLETED",
-      source: "server",
-    },
-    {
-      id: "evt_temp_1",
-      idempotencyKey: "seed_temp_1",
-      kind: "TEMPERATURE",
-      actor: "dad",
-      occurredAt: nowMinus(170),
-      summary: "Температура 36.8°C",
-      payload: { temperatureC: 36.8 },
-      status: "LOGGED",
-      source: "server",
-    },
-    {
-      id: "evt_sleep_1",
-      idempotencyKey: "seed_sleep_1",
-      kind: "SLEEP",
-      actor: "dad",
-      occurredAt: nowMinus(32),
-      summary: "Сон начался",
-      payload: { phase: "START" },
-      status: "STARTED",
-      source: "server",
-    },
-    {
-      id: "evt_diaper_1",
-      idempotencyKey: "seed_diaper_1",
-      kind: "DIAPER",
-      actor: "mom",
-      occurredAt: nowMinus(118),
-      summary: "Подгузник — моча",
-      payload: { type: "WET" },
-      status: "LOGGED",
-      source: "server",
-    },
-    {
-      id: "evt_med_1",
-      idempotencyKey: "seed_med_1",
-      kind: "MEDICATION",
-      actor: "mom",
-      occurredAt: nowMinus(420),
-      summary: "Витамин D — 1 капля",
-      payload: { medication: "Витамин D", dose: "1 капля" },
-      status: "COMPLETED",
-      source: "server",
-    },
-    {
-      id: "evt_feed_2",
-      idempotencyKey: "seed_feed_2",
-      kind: "FEEDING",
-      actor: "dad",
-      occurredAt: nowMinus(275),
-      summary: "Бутылочка — 120 мл",
-      payload: { mode: "BOTTLE", volumeMl: 120 },
-      status: "COMPLETED",
-      source: "server",
-    },
-    {
-      id: "evt_note_1",
-      idempotencyKey: "seed_note_1",
-      kind: "NOTE",
-      actor: "mom",
-      occurredAt: nowMinus(510),
-      summary: "Настроение спокойное, хорошо уснул после прогулки",
-      payload: { note: "Настроение спокойное, хорошо уснул после прогулки" },
-      status: "LOGGED",
-      source: "server",
-    },
-    {
-      id: "evt_sleep_0",
-      idempotencyKey: "seed_sleep_0",
-      kind: "SLEEP",
-      actor: "mom",
-      occurredAt: nowMinus(275),
-      summary: "Проснулся",
-      payload: { phase: "END" },
-      status: "COMPLETED",
-      source: "server",
-    },
-  ];
-
-  return events.sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime());
+  return [];
 }
 
 function isToday(timestamp: string): boolean {
@@ -216,6 +121,17 @@ function getReminders(events: CareEventRecord[]): ReminderCard[] {
 }
 
 export function getInsights(snapshot: DashboardSnapshot): AiInsight[] {
+  if (snapshot.events.length === 0) {
+    return [
+      {
+        id: "insight_empty",
+        title: "Данных пока нет",
+        body: "После первой записи здесь появятся подсказки по кормлениям, сну и режиму.",
+        tone: "default",
+      },
+    ];
+  }
+
   const lastFeed = snapshot.events.find((event) => event.kind === "FEEDING");
   const temperatureEvent = snapshot.events.find((event) => event.kind === "TEMPERATURE");
 
@@ -355,10 +271,10 @@ export function mergeSnapshot(
     deduped.set(key, { ...event, ...(overrides[event.id] ?? {}) });
   });
 
-  return buildSnapshotFromEvents(Array.from(deduped.values()));
+  return buildSnapshotFromEvents(Array.from(deduped.values()), snapshot.child);
 }
 
 export function upsertSnapshotEvent(snapshot: DashboardSnapshot, event: CareEventRecord): DashboardSnapshot {
   const events = snapshot.events.filter((item) => item.id !== event.id && item.idempotencyKey !== event.idempotencyKey);
-  return buildSnapshotFromEvents([event, ...events]);
+  return buildSnapshotFromEvents([event, ...events], snapshot.child);
 }

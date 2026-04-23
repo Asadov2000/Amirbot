@@ -7,6 +7,7 @@ import type { ActorId, CareEventRecord, DashboardSnapshot, EventDraft } from "..
 import { ensureDefaultFamilyContext, type DefaultFamilyContext } from "./family-context";
 
 const careEventRepository = new CareEventRepository(prisma);
+const isProduction = process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 
 interface DashboardCreateInput {
   familyId: string;
@@ -304,16 +305,21 @@ function buildIdempotencyKey(
 function toCreateInput(
   draft: EventDraft,
   context: DefaultFamilyContext,
+  actor: ActorId = draft.actor,
   seed?: string,
 ): DashboardCreateInput {
-  const actorUserId = context.actors[draft.actor].userId;
+  const actorUserId = context.actors[actor].userId;
   const occurredAt = new Date(draft.occurredAt);
+  const normalizedDraft = {
+    ...draft,
+    actor,
+  };
   const baseInput = {
     familyId: context.familyId,
     childId: context.childId,
     createdByUserId: actorUserId,
     source: "MANUAL" as const,
-    idempotencyKey: buildIdempotencyKey(context, draft, seed),
+    idempotencyKey: buildIdempotencyKey(context, normalizedDraft, seed),
     occurredAt,
     payload: draft.payload,
   };
@@ -392,13 +398,14 @@ function toUpdateInput(
   id: string,
   draft: EventDraft,
   context: DefaultFamilyContext,
+  updatedByActor: ActorId,
 ) {
-  const createInput = toCreateInput(draft, context, `update:${id}`);
+  const createInput = toCreateInput(draft, context, draft.actor, `update:${id}`);
 
   return {
     id,
     familyId: context.familyId,
-    updatedByUserId: createInput.createdByUserId,
+    updatedByUserId: context.actors[updatedByActor].userId,
     occurredAt: createInput.occurredAt,
     startedAt: createInput.startedAt ?? null,
     endedAt: createInput.endedAt ?? null,
@@ -454,22 +461,32 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     );
   } catch (error) {
     logServerFallback("Falling back to mock dashboard snapshot", error);
+    if (isProduction) {
+      throw error;
+    }
     return createBaseSnapshot();
   }
 }
 
-export async function createDashboardEvent(draft: EventDraft): Promise<CareEventRecord> {
+export async function createDashboardEvent(draft: EventDraft, actor: ActorId = draft.actor): Promise<CareEventRecord> {
   try {
     const context = await ensureDefaultFamilyContext();
-    const created = await careEventRepository.create(toCreateInput(draft, context));
+    const created = await careEventRepository.create(toCreateInput(draft, context, actor));
     return toDashboardEventRecord(created, context);
   } catch (error) {
     logServerFallback("Falling back to mock event creation", error);
+    if (isProduction) {
+      throw error;
+    }
     return createEventRecord(draft, "server");
   }
 }
 
-export async function updateDashboardEvent(id: string, draft: EventDraft): Promise<CareEventRecord> {
+export async function updateDashboardEvent(
+  id: string,
+  draft: EventDraft,
+  updatedByActor: ActorId = draft.actor,
+): Promise<CareEventRecord> {
   try {
     const context = await ensureDefaultFamilyContext();
     const current = await prisma.careEvent.findFirst({
@@ -485,26 +502,31 @@ export async function updateDashboardEvent(id: string, draft: EventDraft): Promi
       throw new Error("CareEvent not found for update");
     }
 
-    const nextCreateInput = toCreateInput(draft, context, `replace:${id}:${current.revision + 1}`);
-    const actorChanged = current.createdByUserId !== nextCreateInput.createdByUserId;
+    const currentActor = resolveActor(current.createdByUserId, context);
+    const nextCreateInput = toCreateInput(draft, context, currentActor, `replace:${id}:${current.revision + 1}`);
     const typeChanged = current.type !== nextCreateInput.type;
 
-    if (actorChanged || typeChanged) {
+    if (typeChanged) {
       await careEventRepository.softDelete({
         id: current.id,
         familyId: context.familyId,
-        deletedByUserId: nextCreateInput.createdByUserId,
-        reason: actorChanged ? "actor-changed" : "type-changed",
+        deletedByUserId: context.actors[updatedByActor].userId,
+        reason: "type-changed",
       });
 
       const recreated = await careEventRepository.create(nextCreateInput);
       return toDashboardEventRecord(recreated, context);
     }
 
-    const updated = await careEventRepository.update(toUpdateInput(id, draft, context));
+    const updated = await careEventRepository.update(
+      toUpdateInput(id, { ...draft, actor: currentActor }, context, updatedByActor),
+    );
     return toDashboardEventRecord(updated, context);
   } catch (error) {
     logServerFallback("Falling back to mock event update", error);
+    if (isProduction) {
+      throw error;
+    }
     return {
       ...createEventRecord(draft, "server"),
       id,

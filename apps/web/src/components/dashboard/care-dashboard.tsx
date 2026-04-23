@@ -376,6 +376,8 @@ export function CareDashboard() {
   const {
     snapshot,
     activeActor,
+    actorLocked,
+    actorDisplayName,
     loading,
     syncing,
     pendingCount,
@@ -400,6 +402,7 @@ export function CareDashboard() {
 
   const currentAction = actionById(sheetActionId);
   const currentPreset = currentAction?.presets.find((preset) => preset.id === selectedPresetId) ?? currentAction?.presets[0];
+  const canChangeActor = !actorLocked;
 
   const openCreateSheet = (actionId: ActionId) => {
     const action = actionById(actionId);
@@ -422,7 +425,7 @@ export function CareDashboard() {
     setSelectedPresetId(presetId);
     setInputValue(extractInputValue(event) || preset?.defaultInput || "");
     setTimeValue(toTimeInput(event.occurredAt));
-    setSheetActor(event.actor);
+    setSheetActor(activeActor);
     setEditingEvent(event);
   };
 
@@ -445,7 +448,7 @@ export function CareDashboard() {
     setSubmitting(true);
     try {
       const draft = currentPreset.buildDraft({
-        actor: sheetActor,
+        actor: editingEvent ? editingEvent.actor : sheetActor,
         occurredAt: combineDateAndTime(editingEvent?.occurredAt ?? new Date().toISOString(), timeValue),
         inputValue,
       });
@@ -522,16 +525,22 @@ export function CareDashboard() {
           </div>
 
           <div className="actor-toggle">
-            {(["mom", "dad"] as ActorId[]).map((actor) => (
-              <button
-                key={actor}
-                type="button"
-                onClick={() => changeActor(actor)}
-                className={actor === activeActor ? "actor-chip active" : "actor-chip"}
-              >
-                {actorLabel(actor)}
+            {canChangeActor ? (
+              (["mom", "dad"] as ActorId[]).map((actor) => (
+                <button
+                  key={actor}
+                  type="button"
+                  onClick={() => changeActor(actor)}
+                  className={actor === activeActor ? "actor-chip active" : "actor-chip"}
+                >
+                  {actorLabel(actor)}
+                </button>
+              ))
+            ) : (
+              <button type="button" className="actor-chip active" disabled>
+                {actorDisplayName}
               </button>
-            ))}
+            )}
           </div>
         </Card>
       </section>
@@ -590,33 +599,41 @@ export function CareDashboard() {
         <Card>
           <SectionTitle eyebrow="Лента семьи" title="Последние действия" action={<GhostButton onClick={() => setActiveTab("feed")}>Вся лента</GhostButton>} />
           <div className="timeline-list">
-            {snapshot.events.slice(0, 4).map((event) => (
-              <TimelineItem
-                key={event.id}
-                title={event.summary}
-                subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}`}
-                meta={formatDateTime(event.occurredAt)}
-                accent={accentFromEvent(event.kind)}
-                action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
-              />
-            ))}
+            {snapshot.events.length ? (
+              snapshot.events.slice(0, 4).map((event) => (
+                <TimelineItem
+                  key={event.id}
+                  title={event.summary}
+                  subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}`}
+                  meta={formatDateTime(event.occurredAt)}
+                  accent={accentFromEvent(event.kind)}
+                  action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
+                />
+              ))
+            ) : (
+              <EmptyState title="Лента пока пустая" description="Здесь появятся только реальные действия мамы и папы." />
+            )}
           </div>
         </Card>
 
         <Card>
           <SectionTitle eyebrow="Напоминания" title="Кому и когда напомнить" />
           <div className="stack-list">
-            {snapshot.reminders.map((reminder) => (
-              <Surface key={reminder.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{reminder.title}</div>
-                  <div style={{ marginTop: 4, color: "var(--muted-strong)" }}>
-                    {reminder.channel === "bot" ? "Придёт в Telegram боте" : "Покажется в Mini App"}
+            {snapshot.reminders.length ? (
+              snapshot.reminders.map((reminder) => (
+                <Surface key={reminder.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{reminder.title}</div>
+                    <div style={{ marginTop: 4, color: "var(--muted-strong)" }}>
+                      {reminder.channel === "bot" ? "Придёт в Telegram боте" : "Покажется в Mini App"}
+                    </div>
                   </div>
-                </div>
-                <Pill tone={reminder.tone}>{reminder.dueLabel}</Pill>
-              </Surface>
-            ))}
+                  <Pill tone={reminder.tone}>{reminder.dueLabel}</Pill>
+                </Surface>
+              ))
+            ) : (
+              <EmptyState title="Напоминаний пока нет" description="Они появятся после первых кормлений, подгузников или лекарств." />
+            )}
           </div>
         </Card>
       </section>
@@ -647,20 +664,24 @@ export function CareDashboard() {
       <Card>
         <SectionTitle eyebrow="Все действия" title="Семейная лента" />
         <div className="timeline-list">
-          {snapshot.events.map((event) => (
-            <Surface key={event.id} style={{ padding: 18 }}>
-              <TimelineItem
-                title={event.summary}
-                subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}${event.editedAt ? " • исправлено" : ""}`}
-                meta={formatDateTime(event.occurredAt)}
-                accent={accentFromEvent(event.kind)}
-                action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
-              />
-              <div style={{ marginTop: 14 }}>
-                <Pill tone={toneFromEvent(event)}>{event.source === "local" ? "Локально/синхронизируется" : "В базе семьи"}</Pill>
-              </div>
-            </Surface>
-          ))}
+          {snapshot.events.length ? (
+            snapshot.events.map((event) => (
+              <Surface key={event.id} style={{ padding: 18 }}>
+                <TimelineItem
+                  title={event.summary}
+                  subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}${event.editedAt ? " • исправлено" : ""}`}
+                  meta={formatDateTime(event.occurredAt)}
+                  accent={accentFromEvent(event.kind)}
+                  action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
+                />
+                <div style={{ marginTop: 14 }}>
+                  <Pill tone={toneFromEvent(event)}>{event.source === "local" ? "Локально/синхронизируется" : "В базе семьи"}</Pill>
+                </div>
+              </Surface>
+            ))
+          ) : (
+            <EmptyState title="Событий пока нет" description="Начните с кормления, сна или подгузника. Здесь не будет демо-записей." />
+          )}
         </div>
       </Card>
     </section>
@@ -787,18 +808,26 @@ export function CareDashboard() {
               <GhostButton onClick={closeSheet}>Закрыть</GhostButton>
             </div>
 
-            <div className="actor-toggle">
-              {(["mom", "dad"] as ActorId[]).map((actor) => (
-                <button
-                  key={actor}
-                  type="button"
-                  onClick={() => setSheetActor(actor)}
-                  className={actor === sheetActor ? "actor-chip active" : "actor-chip"}
-                >
-                  {actorLabel(actor)}
-                </button>
-              ))}
-            </div>
+            {!editingEvent ? (
+              <div className="actor-toggle">
+                {canChangeActor ? (
+                  (["mom", "dad"] as ActorId[]).map((actor) => (
+                    <button
+                      key={actor}
+                      type="button"
+                      onClick={() => setSheetActor(actor)}
+                      className={actor === sheetActor ? "actor-chip active" : "actor-chip"}
+                    >
+                      {actorLabel(actor)}
+                    </button>
+                  ))
+                ) : (
+                  <button type="button" className="actor-chip active" disabled>
+                    {actorDisplayName}
+                  </button>
+                )}
+              </div>
+            ) : null}
 
             <div className="preset-list">
               {currentAction.presets.map((preset) => (

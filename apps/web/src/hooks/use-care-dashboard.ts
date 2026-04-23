@@ -8,12 +8,15 @@ import {
   getLocalEvents,
   getPendingEvents,
   getStoredActor,
+  removeEventOverride,
+  removeLocalEvent,
   removePendingEvent,
   saveEventOverride,
   setStoredActor,
   upsertLocalEvent,
 } from "@/lib/offline-queue";
 import { createEventRecord, mergeSnapshot, upsertSnapshotEvent } from "@/lib/mock-data";
+import { buildTelegramHeaders, resolveTelegramActor } from "@/lib/telegram-identity";
 import type { ActorId, CareEventRecord, DashboardSnapshot, EventDraft } from "@/lib/types";
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -40,6 +43,8 @@ export function useCareDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [online, setOnline] = useState(true);
+  const [actorLocked, setActorLocked] = useState(false);
+  const [actorDisplayName, setActorDisplayName] = useState("Мама");
   const [aiAnswer, setAiAnswer] = useState<string>("");
   const [error, setError] = useState<string>("");
 
@@ -82,8 +87,9 @@ export function useCareDashboard() {
     setSyncing(true);
     try {
       for (const event of pendingEvents) {
-        await fetchJson<{ ok: boolean }>("/api/events", {
+        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
           method: "POST",
+          headers: buildTelegramHeaders(event.actor),
           body: JSON.stringify({
             kind: event.kind,
             actor: event.actor,
@@ -94,6 +100,11 @@ export function useCareDashboard() {
           } satisfies EventDraft),
         });
         removePendingEvent(event.id);
+        removeLocalEvent(event.id);
+        removeEventOverride(event.id);
+        startTransition(() => {
+          setSnapshot((current) => (current ? upsertSnapshotEvent(current, response.event) : current));
+        });
       }
       setPendingCount(getPendingEvents().length);
     } finally {
@@ -102,7 +113,19 @@ export function useCareDashboard() {
   });
 
   useEffect(() => {
-    setActiveActor(getStoredActor());
+    const telegramActor = resolveTelegramActor();
+
+    if (telegramActor) {
+      setActiveActor(telegramActor.actor);
+      setActorLocked(telegramActor.locked);
+      setActorDisplayName(telegramActor.displayName);
+    } else {
+      const storedActor = getStoredActor();
+      setActiveActor(storedActor);
+      setActorLocked(false);
+      setActorDisplayName(storedActor === "dad" ? "Папа" : "Мама");
+    }
+
     setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
     void refreshSnapshot();
     void refreshAi();
@@ -126,7 +149,12 @@ export function useCareDashboard() {
   }, []);
 
   const changeActor = (actor: ActorId) => {
+    if (actorLocked) {
+      return;
+    }
+
     setActiveActor(actor);
+    setActorDisplayName(actor === "dad" ? "Папа" : "Мама");
     setStoredActor(actor);
   };
 
@@ -141,9 +169,16 @@ export function useCareDashboard() {
 
     if (typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        await fetchJson<{ ok: boolean }>("/api/events", {
+        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
           method: "POST",
+          headers: buildTelegramHeaders(draft.actor),
           body: JSON.stringify(draft),
+        });
+        const nextLocalEvents = removeLocalEvent(event.id);
+        startTransition(() => {
+          setSnapshot((current) =>
+            current ? upsertSnapshotEvent(mergeSnapshot(current, nextLocalEvents, getEventOverrides()), response.event) : current,
+          );
         });
       } catch {
         enqueuePendingEvent(event);
@@ -173,8 +208,9 @@ export function useCareDashboard() {
 
     if (typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        await fetchJson<{ ok: boolean }>("/api/events", {
+        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
           method: "PUT",
+          headers: buildTelegramHeaders(activeActor),
           body: JSON.stringify({
             id: editedEvent.id,
             draft: {
@@ -186,6 +222,13 @@ export function useCareDashboard() {
               status: editedEvent.status,
             } satisfies EventDraft,
           }),
+        });
+        const nextLocalEvents = removeLocalEvent(editedEvent.id);
+        const nextOverrides = removeEventOverride(editedEvent.id);
+        startTransition(() => {
+          setSnapshot((current) =>
+            current ? upsertSnapshotEvent(mergeSnapshot(current, nextLocalEvents, nextOverrides), response.event) : current,
+          );
         });
       } catch {
         enqueuePendingEvent(editedEvent);
@@ -215,6 +258,8 @@ export function useCareDashboard() {
   return {
     snapshot,
     activeActor,
+    actorLocked,
+    actorDisplayName,
     loading,
     syncing,
     pendingCount,
