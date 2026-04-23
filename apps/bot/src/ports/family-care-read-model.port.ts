@@ -2,7 +2,7 @@ import type { BotUserContext, TodayDigest } from "../domain/types.js";
 
 export interface BotInteractionAuditEntry {
   telegramUserId: string;
-  command: "start" | "today" | "internal-reminder";
+  command: "start" | "today" | "whoami" | "internal-reminder";
   occurredAt: Date;
   metadata?: Record<string, unknown>;
 }

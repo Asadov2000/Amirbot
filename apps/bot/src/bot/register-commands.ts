@@ -69,4 +69,31 @@ export function registerCommands(
 
     dependencies.logger.info("Handled /today command", { telegramUserId });
   });
+
+  bot.command("whoami", async (ctx) => {
+    const telegramUserId = String(ctx.from?.id ?? "");
+    const username = ctx.from?.username ? `@${ctx.from.username}` : "не задан";
+
+    await dependencies.readModel.recordBotInteraction({
+      telegramUserId,
+      command: "whoami",
+      occurredAt: new Date()
+    });
+
+    await ctx.reply(
+      [
+        "<b>Ваш Telegram профиль</b>",
+        `ID: <code>${telegramUserId}</code>`,
+        `Username: <code>${username}</code>`
+      ].join("\n"),
+      {
+        parse_mode: "HTML",
+        link_preview_options: {
+          is_disabled: true
+        }
+      }
+    );
+
+    dependencies.logger.info("Handled /whoami command", { telegramUserId });
+  });
 }

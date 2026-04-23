@@ -49,6 +49,10 @@ export async function startBotApplication(
     {
       command: "today",
       description: "Показать сводку за сегодня"
+    },
+    {
+      command: "whoami",
+      description: "Показать мой Telegram ID"
     }
   ]);
 
