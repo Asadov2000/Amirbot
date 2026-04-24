@@ -1,5 +1,26 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "APP_ENV",
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "BOT_TOKEN",
+    "BOT_DEFAULT_CHILD_NAME",
+    "DEFAULT_FAMILY_NAME",
+    "DEFAULT_CHILD_NAME",
+    "DEFAULT_CHILD_BIRTH_DATE",
+    "DEFAULT_MOM_USERNAME",
+    "DEFAULT_DAD_USERNAME",
+    "DEFAULT_MOM_TELEGRAM_ID",
+    "DEFAULT_DAD_TELEGRAM_ID",
+    "NEXT_PUBLIC_APP_NAME",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_API_BASE_URL",
+    "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME",
+    "NEXT_PUBLIC_ENABLE_MOCK_TELEGRAM",
+    "NEXT_PUBLIC_DEFAULT_LOCALE",
+    "NEXT_PUBLIC_DEFAULT_TIMEZONE"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
