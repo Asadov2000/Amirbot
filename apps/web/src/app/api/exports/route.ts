@@ -9,6 +9,11 @@ import {
 } from "@/lib/server/export";
 import { resolveRequestActor } from "@/lib/server/telegram-auth";
 
+function statusFromError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Telegram") ? 403 : 500;
+}
+
 export async function GET(request: Request) {
   try {
     resolveRequestActor(request);
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
         ok: false,
         error: error instanceof Error ? error.message : "Access denied",
       },
-      { status: 403 },
+      { status: statusFromError(error) },
     );
   }
 }

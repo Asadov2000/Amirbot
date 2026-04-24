@@ -88,7 +88,7 @@ function actorFromLocalFallback(request: Request): RequestActor | null {
 
 export function resolveRequestActor(request: Request): RequestActor {
   const initData = request.headers.get("x-telegram-init-data");
-  const botToken = process.env.BOT_TOKEN;
+  const botToken = process.env.BOT_TOKEN?.trim();
 
   if (initData && botToken) {
     const params = verifyTelegramInitData(initData, botToken);

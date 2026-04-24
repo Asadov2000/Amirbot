@@ -16,6 +16,7 @@ import {
   upsertLocalEvent,
 } from "@/lib/offline-queue";
 import {
+  createBaseSnapshot,
   createEventRecord,
   mergeSnapshot,
   upsertSnapshotEvent,
@@ -71,12 +72,14 @@ export function useCareDashboard() {
   const [aiAnswer, setAiAnswer] = useState<string>("");
   const [error, setError] = useState<string>("");
 
-  const refreshSnapshot = useEffectEvent(async () => {
+  const refreshSnapshot = useEffectEvent(async (showLoading = true) => {
     if (accessDenied) {
       return;
     }
 
-    setLoading(true);
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const baseSnapshot = await fetchJson<DashboardSnapshot>(
         `/api/dashboard?ts=${Date.now()}`,
@@ -98,14 +101,21 @@ export function useCareDashboard() {
         setPendingCount(pendingEvents.length);
         setError("");
       });
-    } catch (cause) {
-      setError(
-        cause instanceof Error && cause.name === "AbortError"
-          ? "Telegram WebView не дождался ответа сервера. Проверьте сеть и нажмите повторить."
-          : "Не удалось загрузить данные семьи. Нажмите повторить или продолжайте оффлайн.",
+    } catch {
+      const fallbackSnapshot = mergeSnapshot(
+        createBaseSnapshot(),
+        getLocalEvents(),
+        getEventOverrides(),
       );
+      startTransition(() => {
+        setSnapshot((current) => current ?? fallbackSnapshot);
+        setPendingCount(getPendingEvents().length);
+        setError("");
+      });
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   });
 
@@ -169,31 +179,65 @@ export function useCareDashboard() {
   });
 
   useEffect(() => {
-    const telegramActor = resolveTelegramActor();
+    const storedActor = getStoredActor();
+    let retryId: number | undefined;
+    let attempts = 0;
 
-    if (telegramActor) {
+    setActiveActor(storedActor);
+    setActorLocked(false);
+    setActorDisplayName(storedActor === "dad" ? "Папа" : "Мама");
+    setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
+
+    startTransition(() => {
+      setSnapshot(
+        mergeSnapshot(
+          createBaseSnapshot(),
+          getLocalEvents(),
+          getEventOverrides(),
+        ),
+      );
+      setPendingCount(getPendingEvents().length);
+      setLoading(false);
+    });
+
+    const resolveTelegram = () => {
+      attempts += 1;
+      const telegramActor = resolveTelegramActor();
+
+      if (!telegramActor) {
+        if (attempts < 14) {
+          retryId = window.setTimeout(resolveTelegram, 150);
+          return;
+        }
+
+        void refreshSnapshot(false);
+        void refreshAi();
+        return;
+      }
+
       if (!telegramActor.allowed) {
         setAccessDenied(true);
         setActorLocked(true);
         setActorDisplayName("Нет доступа");
         setError(telegramActor.deniedReason ?? "Доступ закрыт.");
-        setLoading(false);
         return;
       }
 
       setActiveActor(telegramActor.actor);
       setActorLocked(telegramActor.locked);
       setActorDisplayName(telegramActor.displayName);
-    } else {
-      const storedActor = getStoredActor();
-      setActiveActor(storedActor);
-      setActorLocked(false);
-      setActorDisplayName(storedActor === "dad" ? "Папа" : "Мама");
-    }
+      setStoredActor(telegramActor.actor);
+      void refreshSnapshot(false);
+      void refreshAi();
+    };
 
-    setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
-    void refreshSnapshot();
-    void refreshAi();
+    resolveTelegram();
+
+    return () => {
+      if (retryId) {
+        window.clearTimeout(retryId);
+      }
+    };
   }, []);
 
   useEffect(() => {
