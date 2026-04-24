@@ -2,12 +2,28 @@ import { createHash } from "node:crypto";
 
 import { CareEventRepository, prisma } from "@amir/db";
 
-import { buildSnapshotFromEvents, createBaseSnapshot, createEventRecord } from "../mock-data";
-import type { ActorId, CareEventRecord, DashboardSnapshot, EventDraft } from "../types";
-import { ensureDefaultFamilyContext, type DefaultFamilyContext } from "./family-context";
+import {
+  buildSnapshotFromEvents,
+  createBaseSnapshot,
+  createEventRecord,
+} from "../mock-data";
+import { buildQuickItemKey, normalizeQuickItemLabel } from "../quick-items";
+import type {
+  ActorId,
+  CareEventRecord,
+  DashboardSnapshot,
+  EventDraft,
+  QuickItemKind,
+  QuickItemRecord,
+} from "../types";
+import {
+  ensureDefaultFamilyContext,
+  type DefaultFamilyContext,
+} from "./family-context";
 
 const careEventRepository = new CareEventRepository(prisma);
-const isProduction = process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
+const isProduction =
+  process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 
 interface DashboardCreateInput {
   familyId: string;
@@ -34,11 +50,24 @@ interface DashboardCreateInput {
   durationSeconds?: number;
   diaperKind?: "WET" | "DIRTY" | "MIXED" | "DRY_CHECK";
   temperatureC?: number;
-  temperatureMethod?: "AXILLARY" | "ORAL" | "RECTAL" | "EAR" | "FOREHEAD" | "OTHER";
+  temperatureMethod?:
+    | "AXILLARY"
+    | "ORAL"
+    | "RECTAL"
+    | "EAR"
+    | "FOREHEAD"
+    | "OTHER";
   medicationName?: string;
   medicationDose?: number;
   medicationUnit?: string;
-  medicationRoute?: "ORAL" | "TOPICAL" | "NASAL" | "INHALATION" | "INJECTION" | "RECTAL" | "OTHER";
+  medicationRoute?:
+    | "ORAL"
+    | "TOPICAL"
+    | "NASAL"
+    | "INHALATION"
+    | "INJECTION"
+    | "RECTAL"
+    | "OTHER";
   reminderId?: string;
   medicationScheduleId?: string;
 }
@@ -74,7 +103,10 @@ function getPayloadRecord(payload: unknown) {
 }
 
 function resolveActor(userId: string, context: DefaultFamilyContext): ActorId {
-  return userId === context.actors.dad.userId ? "dad" : "mom";
+  return userId === context.actors.dad.userId ||
+    context.actors.dad.legacyUserIds.includes(userId)
+    ? "dad"
+    : "mom";
 }
 
 function resolveSleepPhase(
@@ -122,13 +154,16 @@ function buildMedicationSummary(event: {
 function toDashboardEventRecord(
   event: Awaited<ReturnType<typeof prisma.careEvent.findFirstOrThrow>>,
   context: DefaultFamilyContext,
-): CareEventRecord {
+): CareEventRecord | null {
   const payload = getPayloadRecord(event.payload);
   const actor = resolveActor(event.createdByUserId, context);
 
   switch (event.type) {
     case "BREASTFEEDING": {
-      const durationMinutes = Math.max(1, Math.round((event.durationSeconds ?? 0) / 60) || 1);
+      const durationMinutes = Math.max(
+        1,
+        Math.round((event.durationSeconds ?? 0) / 60) || 1,
+      );
 
       return {
         id: event.id,
@@ -142,7 +177,8 @@ function toDashboardEventRecord(
           durationMinutes,
         },
         status: "COMPLETED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
@@ -161,7 +197,8 @@ function toDashboardEventRecord(
           volumeMl,
         },
         status: "COMPLETED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
@@ -174,17 +211,24 @@ function toDashboardEventRecord(
         kind: "SLEEP",
         actor,
         occurredAt: event.occurredAt.toISOString(),
-        summary: event.note?.trim() || (phase === "END" ? "Проснулся" : "Сон начался"),
+        summary:
+          event.note?.trim() || (phase === "END" ? "Проснулся" : "Сон начался"),
         payload: {
           phase,
         },
         status: phase === "END" ? "COMPLETED" : "STARTED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
     case "DIAPER": {
-      const diaperKind = event.diaperKind === "DIRTY" ? "DIRTY" : event.diaperKind === "MIXED" ? "MIXED" : "WET";
+      const diaperKind =
+        event.diaperKind === "DIRTY"
+          ? "DIRTY"
+          : event.diaperKind === "MIXED"
+            ? "MIXED"
+            : "WET";
 
       return {
         id: event.id,
@@ -203,7 +247,8 @@ function toDashboardEventRecord(
           type: diaperKind,
         },
         status: "LOGGED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
@@ -216,12 +261,14 @@ function toDashboardEventRecord(
         kind: "TEMPERATURE",
         actor,
         occurredAt: event.occurredAt.toISOString(),
-        summary: event.note?.trim() || `Температура ${temperatureC.toFixed(1)}°C`,
+        summary:
+          event.note?.trim() || `Температура ${temperatureC.toFixed(1)}°C`,
         payload: {
           temperatureC,
         },
         status: "LOGGED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
@@ -239,18 +286,27 @@ function toDashboardEventRecord(
           medication: event.medicationName ?? "Лекарство",
           dose:
             dose === null
-              ? event.medicationUnit ?? "без дозы"
+              ? (event.medicationUnit ?? "без дозы")
               : `${dose}${event.medicationUnit ? ` ${event.medicationUnit}` : ""}`,
         },
         status: "COMPLETED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
     case "NOTE":
     default: {
       const dashboardKind =
-        payload.dashboardKind === "SOLID_FOOD" || payload.dashboardKind === "GROWTH" ? payload.dashboardKind : null;
+        payload.dashboardKind === "SOLID_FOOD" ||
+        payload.dashboardKind === "GROWTH" ||
+        payload.dashboardKind === "QUICK_ITEM_DELETE"
+          ? payload.dashboardKind
+          : null;
+
+      if (dashboardKind === "QUICK_ITEM_DELETE") {
+        return null;
+      }
 
       if (dashboardKind) {
         return {
@@ -262,7 +318,8 @@ function toDashboardEventRecord(
           summary: event.note?.trim() || String(payload.note ?? "Запись"),
           payload,
           status: "LOGGED",
-          editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+          editedAt:
+            event.revision > 1 ? event.updatedAt.toISOString() : undefined,
           source: "server",
         };
       }
@@ -279,11 +336,93 @@ function toDashboardEventRecord(
           note: event.note?.trim() || "Заметка",
         },
         status: "LOGGED",
-        editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+        editedAt:
+          event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
     }
   }
+}
+
+function isQuickItemKind(value: unknown): value is QuickItemKind {
+  return value === "SOLID_FOOD" || value === "MEDICATION";
+}
+
+function deriveQuickItemsFromEvents(
+  events: Array<Awaited<ReturnType<typeof prisma.careEvent.findMany>>[number]>,
+): QuickItemRecord[] {
+  const items = new Map<string, QuickItemRecord>();
+
+  [...events]
+    .sort(
+      (left, right) => left.occurredAt.getTime() - right.occurredAt.getTime(),
+    )
+    .forEach((event) => {
+      const payload = getPayloadRecord(event.payload);
+
+      if (
+        event.type === "NOTE" &&
+        payload.dashboardKind === "QUICK_ITEM_DELETE"
+      ) {
+        const kind = isQuickItemKind(payload.quickKind)
+          ? payload.quickKind
+          : null;
+        const label = normalizeQuickItemLabel(String(payload.label ?? ""));
+        const key =
+          typeof payload.key === "string"
+            ? payload.key
+            : kind && label
+              ? buildQuickItemKey(kind, label)
+              : "";
+
+        if (key) {
+          items.delete(key);
+        }
+        return;
+      }
+
+      if (event.type === "NOTE" && payload.dashboardKind === "SOLID_FOOD") {
+        const label = normalizeQuickItemLabel(
+          String(payload.food ?? payload.note ?? ""),
+        );
+        if (!label || label === "Прикорм") {
+          return;
+        }
+
+        const key = buildQuickItemKey("SOLID_FOOD", label);
+        items.set(key, {
+          kind: "SOLID_FOOD",
+          key,
+          label,
+          updatedAt: event.occurredAt.toISOString(),
+        });
+      }
+
+      if (event.type === "MEDICATION") {
+        const label = normalizeQuickItemLabel(event.medicationName ?? "");
+        if (!label || label === "Лекарство") {
+          return;
+        }
+
+        const dose = toNumber(event.medicationDose);
+        const unit = event.medicationUnit?.trim();
+        const detail =
+          dose === null ? unit : `${dose}${unit ? ` ${unit}` : ""}`;
+        const key = buildQuickItemKey("MEDICATION", label);
+        items.set(key, {
+          kind: "MEDICATION",
+          key,
+          label,
+          detail: detail && detail !== "без дозы" ? detail : undefined,
+          updatedAt: event.occurredAt.toISOString(),
+        });
+      }
+    });
+
+  return Array.from(items.values()).sort(
+    (left, right) =>
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
 }
 
 function parseMedicationDose(rawValue: unknown) {
@@ -329,7 +468,11 @@ function buildIdempotencyKey(
 }
 
 function assertActorCanCreateDraft(draft: EventDraft, actor: ActorId) {
-  if (actor === "dad" && draft.kind === "FEEDING" && draft.payload.mode === "BREAST") {
+  if (
+    actor === "dad" &&
+    draft.kind === "FEEDING" &&
+    draft.payload.mode === "BREAST"
+  ) {
     throw new Error("Breastfeeding is available only for mom");
   }
 }
@@ -371,7 +514,10 @@ function toCreateInput(
         ...baseInput,
         type: "BREASTFEEDING" as const,
         breastSide: "BOTH" as const,
-        durationSeconds: Math.max(60, Math.round((toNumber(draft.payload.durationMinutes) ?? 0) * 60)),
+        durationSeconds: Math.max(
+          60,
+          Math.round((toNumber(draft.payload.durationMinutes) ?? 0) * 60),
+        ),
         note: draft.summary,
       };
     case "SLEEP": {
@@ -409,7 +555,8 @@ function toCreateInput(
         note: draft.summary,
       };
     case "MEDICATION": {
-      const medicationName = String(draft.payload.medication ?? "Лекарство").trim() || "Лекарство";
+      const medicationName =
+        String(draft.payload.medication ?? "Лекарство").trim() || "Лекарство";
       const medicationDose = parseMedicationDose(draft.payload.dose);
 
       return {
@@ -457,7 +604,12 @@ function toUpdateInput(
   context: DefaultFamilyContext,
   updatedByActor: ActorId,
 ) {
-  const createInput = toCreateInput(draft, context, draft.actor, `update:${id}`);
+  const createInput = toCreateInput(
+    draft,
+    context,
+    draft.actor,
+    `update:${id}`,
+  );
 
   return {
     id,
@@ -509,12 +661,15 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     });
 
     return buildSnapshotFromEvents(
-      events.map((event) => toDashboardEventRecord(event, context)),
+      events
+        .map((event) => toDashboardEventRecord(event, context))
+        .filter((event): event is CareEventRecord => Boolean(event)),
       {
         id: context.childId,
         name: context.childName,
         birthDate: context.childBirthDate,
       },
+      deriveQuickItemsFromEvents(events),
     );
   } catch (error) {
     logServerFallback("Falling back to mock dashboard snapshot", error);
@@ -525,13 +680,73 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   }
 }
 
-export async function createDashboardEvent(draft: EventDraft, actor: ActorId = draft.actor): Promise<CareEventRecord> {
+export async function deleteDashboardQuickItem(
+  kind: QuickItemKind,
+  label: string,
+  actor: ActorId,
+) {
+  if (!isQuickItemKind(kind)) {
+    throw new Error("Unsupported quick item kind");
+  }
+
+  const normalizedLabel = normalizeQuickItemLabel(label);
+  if (!normalizedLabel) {
+    throw new Error("Quick item label is required");
+  }
+
+  const context = await ensureDefaultFamilyContext();
+  const key = buildQuickItemKey(kind, normalizedLabel);
+  const occurredAt = new Date();
+  const payload = {
+    dashboardKind: "QUICK_ITEM_DELETE",
+    quickKind: kind,
+    key,
+    label: normalizedLabel,
+  };
+  const draft: EventDraft = {
+    kind: "NOTE",
+    actor,
+    occurredAt: occurredAt.toISOString(),
+    summary: `Удалена быстрая кнопка — ${normalizedLabel}`,
+    payload,
+    status: "LOGGED",
+  };
+
+  await careEventRepository.create({
+    familyId: context.familyId,
+    childId: context.childId,
+    createdByUserId: context.actors[actor].userId,
+    source: "MANUAL",
+    idempotencyKey: buildIdempotencyKey(
+      context,
+      draft,
+      `quick-delete:${key}:${occurredAt.getTime()}`,
+    ),
+    occurredAt,
+    payload,
+    type: "NOTE",
+    note: draft.summary,
+  });
+
+  return { key };
+}
+
+export async function createDashboardEvent(
+  draft: EventDraft,
+  actor: ActorId = draft.actor,
+): Promise<CareEventRecord> {
   assertActorCanCreateDraft(draft, actor);
 
   try {
     const context = await ensureDefaultFamilyContext();
-    const created = await careEventRepository.create(toCreateInput(draft, context, actor));
-    return toDashboardEventRecord(created, context);
+    const created = await careEventRepository.create(
+      toCreateInput(draft, context, actor),
+    );
+    const record = toDashboardEventRecord(created, context);
+    if (!record) {
+      throw new Error("Created event is not visible in dashboard");
+    }
+    return record;
   } catch (error) {
     logServerFallback("Falling back to mock event creation", error);
     if (isProduction) {
@@ -563,7 +778,12 @@ export async function updateDashboardEvent(
 
     const currentActor = resolveActor(current.createdByUserId, context);
     assertActorCanCreateDraft(draft, currentActor);
-    const nextCreateInput = toCreateInput(draft, context, currentActor, `replace:${id}:${current.revision + 1}`);
+    const nextCreateInput = toCreateInput(
+      draft,
+      context,
+      currentActor,
+      `replace:${id}:${current.revision + 1}`,
+    );
     const typeChanged = current.type !== nextCreateInput.type;
 
     if (typeChanged) {
@@ -575,13 +795,26 @@ export async function updateDashboardEvent(
       });
 
       const recreated = await careEventRepository.create(nextCreateInput);
-      return toDashboardEventRecord(recreated, context);
+      const record = toDashboardEventRecord(recreated, context);
+      if (!record) {
+        throw new Error("Updated event is not visible in dashboard");
+      }
+      return record;
     }
 
     const updated = await careEventRepository.update(
-      toUpdateInput(id, { ...draft, actor: currentActor }, context, updatedByActor),
+      toUpdateInput(
+        id,
+        { ...draft, actor: currentActor },
+        context,
+        updatedByActor,
+      ),
     );
-    return toDashboardEventRecord(updated, context);
+    const record = toDashboardEventRecord(updated, context);
+    if (!record) {
+      throw new Error("Updated event is not visible in dashboard");
+    }
+    return record;
   } catch (error) {
     logServerFallback("Falling back to mock event update", error);
     if (isProduction) {

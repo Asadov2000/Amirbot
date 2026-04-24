@@ -17,13 +17,35 @@ import {
   TimelineItem,
 } from "@amir/ui";
 
-import { actorLabel, formatDateTime, formatDuration, formatTime } from "@/lib/format";
-import type { ActorId, CareEventKind, CareEventRecord, EventDraft, EventStatus, SummaryPeriodId } from "@/lib/types";
+import {
+  actorLabel,
+  formatDateTime,
+  formatDuration,
+  formatTime,
+} from "@/lib/format";
+import type {
+  ActorId,
+  CareEventKind,
+  CareEventRecord,
+  EventDraft,
+  EventStatus,
+  QuickItemKind,
+  QuickItemRecord,
+  SummaryPeriodId,
+} from "@/lib/types";
 import { useCareDashboard } from "@/hooks/use-care-dashboard";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type TabId = "home" | "log" | "feed" | "summary" | "export";
-type ActionId = "feeding" | "diaper" | "solid_food" | "sleep" | "medication" | "temperature" | "note" | "growth";
+type ActionId =
+  | "feeding"
+  | "diaper"
+  | "solid_food"
+  | "sleep"
+  | "medication"
+  | "temperature"
+  | "note"
+  | "growth";
 type FeedKindFilter = CareEventKind | "ALL";
 type ActorFilter = ActorId | "ALL";
 
@@ -45,8 +67,18 @@ interface ActionPreset {
   inputType?: "text" | "number";
   fields?: ActionField[];
   hiddenForActors?: ActorId[];
+  quickItem?: {
+    kind: QuickItemKind;
+    key: string;
+    label: string;
+  };
   tone?: "default" | "warn" | "danger";
-  buildDraft: (context: { actor: ActorId; occurredAt: string; inputValue: string; fieldValues: Record<string, string> }) => EventDraft;
+  buildDraft: (context: {
+    actor: ActorId;
+    occurredAt: string;
+    inputValue: string;
+    fieldValues: Record<string, string>;
+  }) => EventDraft;
 }
 
 interface ActionDefinition {
@@ -359,11 +391,19 @@ const actions: ActionDefinition[] = [
         buildDraft: ({ actor, occurredAt, fieldValues }) => {
           const weightText = fieldValues.weightKg?.trim() ?? "";
           const heightText = fieldValues.heightCm?.trim() ?? "";
-          const weightKg = weightText ? Number(weightText.replace(",", ".")) : null;
-          const heightCm = heightText ? Number(heightText.replace(",", ".")) : null;
+          const weightKg = weightText
+            ? Number(weightText.replace(",", "."))
+            : null;
+          const heightCm = heightText
+            ? Number(heightText.replace(",", "."))
+            : null;
           const parts = [
-            typeof weightKg === "number" && Number.isFinite(weightKg) ? `${weightKg} кг` : "",
-            typeof heightCm === "number" && Number.isFinite(heightCm) ? `${heightCm} см` : "",
+            typeof weightKg === "number" && Number.isFinite(weightKg)
+              ? `${weightKg} кг`
+              : "",
+            typeof heightCm === "number" && Number.isFinite(heightCm)
+              ? `${heightCm} см`
+              : "",
           ].filter(Boolean);
           const value = parts.join(", ");
           return {
@@ -373,8 +413,14 @@ const actions: ActionDefinition[] = [
             summary: value ? `Вес и рост — ${value}` : "Вес и рост",
             payload: {
               note: value || "Измерение",
-              weightKg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
-              heightCm: typeof heightCm === "number" && Number.isFinite(heightCm) ? heightCm : null,
+              weightKg:
+                typeof weightKg === "number" && Number.isFinite(weightKg)
+                  ? weightKg
+                  : null,
+              heightCm:
+                typeof heightCm === "number" && Number.isFinite(heightCm)
+                  ? heightCm
+                  : null,
             },
             status: "LOGGED",
           };
@@ -384,7 +430,16 @@ const actions: ActionDefinition[] = [
   },
 ];
 
-const actionOrder: ActionId[] = ["feeding", "diaper", "solid_food", "sleep", "medication", "temperature", "note", "growth"];
+const actionOrder: ActionId[] = [
+  "feeding",
+  "diaper",
+  "solid_food",
+  "sleep",
+  "medication",
+  "temperature",
+  "note",
+  "growth",
+];
 const orderedActions = actionOrder
   .map((id) => actions.find((action) => action.id === id))
   .filter((action): action is ActionDefinition => Boolean(action));
@@ -394,11 +449,19 @@ function actionById(id: ActionId | null): ActionDefinition | undefined {
 }
 
 function presetKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-zа-яё0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "item";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-zа-яё0-9]+/gi, "_")
+      .replace(/^_+|_+$/g, "") || "item"
+  );
 }
 
 function getDefaultFieldValues(preset?: ActionPreset): Record<string, string> {
-  return Object.fromEntries((preset?.fields ?? []).map((field) => [field.id, field.defaultValue ?? ""]));
+  return Object.fromEntries(
+    (preset?.fields ?? []).map((field) => [field.id, field.defaultValue ?? ""]),
+  );
 }
 
 function getEventFieldValues(event: CareEventRecord): Record<string, string> {
@@ -454,59 +517,58 @@ function dayTitle(value: string): string {
   }).format(new Date(value));
 }
 
-function getHistoryPresets(action: ActionDefinition, events: CareEventRecord[]): ActionPreset[] {
+function getHistoryPresets(
+  action: ActionDefinition,
+  quickItems: QuickItemRecord[],
+): ActionPreset[] {
   if (action.id === "solid_food") {
-    const foods = Array.from(
-      new Set(
-        events
-          .filter((event) => event.kind === "SOLID_FOOD")
-          .map((event) => String(event.payload.food ?? event.payload.note ?? "").trim())
-          .filter((value) => value && value !== "Прикорм"),
-      ),
-    ).slice(0, 8);
+    const foods = quickItems
+      .filter((item) => item.kind === "SOLID_FOOD")
+      .slice(0, 8);
 
-    return foods.map((food) => ({
-      id: `food_${presetKey(food)}`,
-      label: food,
+    return foods.map((item) => ({
+      id: `food_${presetKey(item.label)}`,
+      label: item.label,
       helper: "Быстрая кнопка из семейного списка",
+      quickItem: {
+        kind: item.kind,
+        key: item.key,
+        label: item.label,
+      },
       buildDraft: ({ actor, occurredAt }) => ({
         kind: "SOLID_FOOD",
         actor,
         occurredAt,
-        summary: `Прикорм — ${food}`,
-        payload: { food },
+        summary: `Прикорм — ${item.label}`,
+        payload: { food: item.label },
         status: "LOGGED",
       }),
     }));
   }
 
   if (action.id === "medication") {
-    const medications = new Map<string, { medication: string; dose: string }>();
-    events
-      .filter((event) => event.kind === "MEDICATION")
-      .forEach((event) => {
-        const medication = String(event.payload.medication ?? "").trim();
-        if (!medication || medication === "Лекарство" || medications.has(medication.toLowerCase())) {
-          return;
-        }
-        medications.set(medication.toLowerCase(), {
-          medication,
-          dose: String(event.payload.dose ?? "").trim(),
-        });
-      });
-
-    return Array.from(medications.values())
+    return quickItems
+      .filter((item) => item.kind === "MEDICATION")
       .slice(0, 8)
-      .map(({ medication, dose }) => ({
-        id: `med_${presetKey(medication)}`,
-        label: medication,
-        helper: dose ? `Быстро: ${dose}` : "Быстрая кнопка из семейного списка",
+      .map((item) => ({
+        id: `med_${presetKey(item.label)}`,
+        label: item.label,
+        helper: item.detail
+          ? `Быстро: ${item.detail}`
+          : "Быстрая кнопка из семейного списка",
+        quickItem: {
+          kind: item.kind,
+          key: item.key,
+          label: item.label,
+        },
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "MEDICATION",
           actor,
           occurredAt,
-          summary: dose ? `Лекарство — ${medication}, ${dose}` : `Лекарство — ${medication}`,
-          payload: { medication, dose: dose || "без дозы" },
+          summary: item.detail
+            ? `Лекарство — ${item.label}, ${item.detail}`
+            : `Лекарство — ${item.label}`,
+          payload: { medication: item.label, dose: item.detail || "без дозы" },
           status: "COMPLETED",
         }),
       }));
@@ -515,10 +577,16 @@ function getHistoryPresets(action: ActionDefinition, events: CareEventRecord[]):
   return [];
 }
 
-function getActionPresets(action: ActionDefinition, actor: ActorId, events: CareEventRecord[]): ActionPreset[] {
+function getActionPresets(
+  action: ActionDefinition,
+  actor: ActorId,
+  quickItems: QuickItemRecord[],
+): ActionPreset[] {
   return [
-    ...getHistoryPresets(action, events),
-    ...action.presets.filter((preset) => !preset.hiddenForActors?.includes(actor)),
+    ...getHistoryPresets(action, quickItems),
+    ...action.presets.filter(
+      (preset) => !preset.hiddenForActors?.includes(actor),
+    ),
   ];
 }
 
@@ -561,7 +629,11 @@ function resolvePresetId(event: CareEventRecord): string {
     case "SLEEP":
       return event.payload.phase === "END" ? "sleep_end" : "sleep_start";
     case "DIAPER":
-      return event.payload.type === "DIRTY" ? "dirty" : event.payload.type === "MIXED" ? "mixed" : "wet";
+      return event.payload.type === "DIRTY"
+        ? "dirty"
+        : event.payload.type === "MIXED"
+          ? "mixed"
+          : "wet";
     case "TEMPERATURE":
       return "temperature";
     case "MEDICATION":
@@ -588,7 +660,9 @@ function combineDateAndTime(baseIso: string, timeValue: string): string {
 
 function extractInputValue(event: CareEventRecord): string {
   if (event.kind === "FEEDING") {
-    return String(event.payload.durationMinutes ?? event.payload.volumeMl ?? "");
+    return String(
+      event.payload.durationMinutes ?? event.payload.volumeMl ?? "",
+    );
   }
 
   if (event.kind === "TEMPERATURE") {
@@ -602,7 +676,9 @@ function extractInputValue(event: CareEventRecord): string {
   if (event.kind === "MEDICATION") {
     const medication = String(event.payload.medication ?? "").trim();
     const dose = String(event.payload.dose ?? "").trim();
-    return [medication, dose && dose !== "без дозы" ? dose : ""].filter(Boolean).join(" — ");
+    return [medication, dose && dose !== "без дозы" ? dose : ""]
+      .filter(Boolean)
+      .join(" — ");
   }
 
   if (event.kind === "GROWTH") {
@@ -617,7 +693,10 @@ function extractInputValue(event: CareEventRecord): string {
 }
 
 function toneFromEvent(event: CareEventRecord): "default" | "warn" | "danger" {
-  if (event.kind === "TEMPERATURE" && Number(event.payload.temperatureC ?? 0) >= 37.5) {
+  if (
+    event.kind === "TEMPERATURE" &&
+    Number(event.payload.temperatureC ?? 0) >= 37.5
+  ) {
     return "danger";
   }
 
@@ -660,6 +739,7 @@ export function CareDashboard() {
     syncing,
     pendingCount,
     online,
+    accessDenied,
     aiAnswer,
     error,
     changeActor,
@@ -668,6 +748,7 @@ export function CareDashboard() {
     refreshSnapshot,
     refreshAi,
     downloadExport,
+    deleteQuickItem,
   } = useCareDashboard();
   const { theme, setTheme } = useThemePreference();
 
@@ -676,25 +757,37 @@ export function CareDashboard() {
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   const [inputValue, setInputValue] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [timeValue, setTimeValue] = useState(toTimeInput(new Date().toISOString()));
+  const [timeValue, setTimeValue] = useState(
+    toTimeInput(new Date().toISOString()),
+  );
   const [sheetActor, setSheetActor] = useState<ActorId>("mom");
-  const [editingEvent, setEditingEvent] = useState<CareEventRecord | null>(null);
+  const [editingEvent, setEditingEvent] = useState<CareEventRecord | null>(
+    null,
+  );
   const [summaryPeriodId, setSummaryPeriodId] = useState<SummaryPeriodId>("1d");
   const [feedKindFilter, setFeedKindFilter] = useState<FeedKindFilter>("ALL");
   const [feedActorFilter, setFeedActorFilter] = useState<ActorFilter>("ALL");
   const [exportPeriodId, setExportPeriodId] = useState<SummaryPeriodId>("30d");
-  const [exportKindFilter, setExportKindFilter] = useState<FeedKindFilter>("ALL");
-  const [exportActorFilter, setExportActorFilter] = useState<ActorFilter>("ALL");
+  const [exportKindFilter, setExportKindFilter] =
+    useState<FeedKindFilter>("ALL");
+  const [exportActorFilter, setExportActorFilter] =
+    useState<ActorFilter>("ALL");
   const [submitting, setSubmitting] = useState(false);
 
   const currentAction = actionById(sheetActionId);
-  const currentPresets = currentAction ? getActionPresets(currentAction, sheetActor, snapshot?.events ?? []) : [];
-  const currentPreset = currentPresets.find((preset) => preset.id === selectedPresetId) ?? currentPresets[0];
+  const currentPresets = currentAction
+    ? getActionPresets(currentAction, sheetActor, snapshot?.quickItems ?? [])
+    : [];
+  const currentPreset =
+    currentPresets.find((preset) => preset.id === selectedPresetId) ??
+    currentPresets[0];
   const canChangeActor = !actorLocked;
 
   const openCreateSheet = (actionId: ActionId) => {
     const action = actionById(actionId);
-    const preset = action ? getActionPresets(action, activeActor, snapshot?.events ?? [])[0] : undefined;
+    const preset = action
+      ? getActionPresets(action, activeActor, snapshot?.quickItems ?? [])[0]
+      : undefined;
     setSheetActionId(actionId);
     setSelectedPresetId(preset?.id ?? "");
     setInputValue(preset?.defaultInput ?? "");
@@ -708,13 +801,19 @@ export function CareDashboard() {
     const actionId = resolveActionId(event.kind);
     const action = actionById(actionId);
     const presetId = resolvePresetId(event);
-    const presets = action ? getActionPresets(action, event.actor, snapshot?.events ?? []) : [];
-    const preset = presets.find((candidate) => candidate.id === presetId) ?? presets[0];
+    const presets = action
+      ? getActionPresets(action, event.actor, snapshot?.quickItems ?? [])
+      : [];
+    const preset =
+      presets.find((candidate) => candidate.id === presetId) ?? presets[0];
 
     setSheetActionId(actionId);
     setSelectedPresetId(preset?.id ?? presetId);
     setInputValue(extractInputValue(event) || preset?.defaultInput || "");
-    setFieldValues({ ...getDefaultFieldValues(preset), ...getEventFieldValues(event) });
+    setFieldValues({
+      ...getDefaultFieldValues(preset),
+      ...getEventFieldValues(event),
+    });
     setTimeValue(toTimeInput(event.occurredAt));
     setSheetActor(event.actor);
     setEditingEvent(event);
@@ -733,11 +832,19 @@ export function CareDashboard() {
       return;
     }
 
-    if (currentPreset.inputType === "text" && currentAction.id === "note" && !inputValue.trim()) {
+    if (
+      currentPreset.inputType === "text" &&
+      currentAction.id === "note" &&
+      !inputValue.trim()
+    ) {
       return;
     }
 
-    if (currentAction.id === "growth" && !fieldValues.weightKg?.trim() && !fieldValues.heightCm?.trim()) {
+    if (
+      currentAction.id === "growth" &&
+      !fieldValues.weightKg?.trim() &&
+      !fieldValues.heightCm?.trim()
+    ) {
       return;
     }
 
@@ -745,7 +852,10 @@ export function CareDashboard() {
     try {
       const draft = currentPreset.buildDraft({
         actor: editingEvent ? editingEvent.actor : sheetActor,
-        occurredAt: combineDateAndTime(editingEvent?.occurredAt ?? new Date().toISOString(), timeValue),
+        occurredAt: combineDateAndTime(
+          editingEvent?.occurredAt ?? new Date().toISOString(),
+          timeValue,
+        ),
         inputValue,
         fieldValues,
       });
@@ -769,13 +879,53 @@ export function CareDashboard() {
     }
   };
 
+  const handleDeleteQuickItem = async (preset: ActionPreset) => {
+    if (!preset.quickItem) {
+      return;
+    }
+
+    const accepted = window.confirm(
+      `Удалить быструю кнопку «${preset.quickItem.label}»? История событий останется.`,
+    );
+    if (!accepted) {
+      return;
+    }
+
+    await deleteQuickItem(
+      preset.quickItem.kind,
+      preset.quickItem.label,
+      preset.quickItem.key,
+    );
+  };
+
+  if (accessDenied) {
+    return (
+      <div className="page-shell">
+        <Card className="app-loading-card access-card">
+          <div className="empty-icon" aria-hidden="true">
+            !
+          </div>
+          <div className="loading-copy">Доступ закрыт</div>
+          <div className="loading-hint">
+            {error || "Mini App доступен только маме @manizha_u и папе @yamob."}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="page-shell">
         <Card className="app-loading-card">
           <div className="loading-spinner" aria-hidden="true" />
-          <div className="loading-copy">Собираю семейную ленту и свежие показатели…</div>
-          <div className="loading-hint">Если Telegram Desktop держит окно открытым, ответ сервера ограничен таймаутом.</div>
+          <div className="loading-copy">
+            Собираю семейную ленту и свежие показатели…
+          </div>
+          <div className="loading-hint">
+            Если Telegram Desktop держит окно открытым, ответ сервера ограничен
+            таймаутом.
+          </div>
         </Card>
       </div>
     );
@@ -785,13 +935,18 @@ export function CareDashboard() {
     return (
       <div className="page-shell">
         <Card className="app-loading-card">
-          <div className="empty-icon" aria-hidden="true">!</div>
+          <div className="empty-icon" aria-hidden="true">
+            !
+          </div>
           <div className="loading-copy">Не удалось открыть данные семьи</div>
           <div className="loading-hint">
-            {error || "Проверьте интернет в Telegram и повторите загрузку. Локальные записи не удаляются."}
+            {error ||
+              "Проверьте интернет в Telegram и повторите загрузку. Локальные записи не удаляются."}
           </div>
           <div className="retry-row">
-            <PrimaryButton onClick={() => void refreshSnapshot()}>Повторить</PrimaryButton>
+            <PrimaryButton onClick={() => void refreshSnapshot()}>
+              Повторить
+            </PrimaryButton>
           </div>
         </Card>
       </div>
@@ -799,7 +954,9 @@ export function CareDashboard() {
   }
 
   const activeSummary =
-    snapshot.periodSummaries.find((summary) => summary.id === summaryPeriodId) ??
+    snapshot.periodSummaries.find(
+      (summary) => summary.id === summaryPeriodId,
+    ) ??
     snapshot.periodSummaries[0] ??
     ({
       ...snapshot.summary,
@@ -853,11 +1010,15 @@ export function CareDashboard() {
 
   const latestGrowth = snapshot.events.find((event) => event.kind === "GROWTH");
   const filteredFeedEvents = snapshot.events.filter((event) => {
-    const matchesKind = feedKindFilter === "ALL" || event.kind === feedKindFilter;
-    const matchesActor = feedActorFilter === "ALL" || event.actor === feedActorFilter;
+    const matchesKind =
+      feedKindFilter === "ALL" || event.kind === feedKindFilter;
+    const matchesActor =
+      feedActorFilter === "ALL" || event.actor === feedActorFilter;
     return matchesKind && matchesActor;
   });
-  const feedGroups = filteredFeedEvents.reduce<Array<{ key: string; title: string; events: CareEventRecord[] }>>((groups, event) => {
+  const feedGroups = filteredFeedEvents.reduce<
+    Array<{ key: string; title: string; events: CareEventRecord[] }>
+  >((groups, event) => {
     const key = dayKey(event.occurredAt);
     const current = groups.find((group) => group.key === key);
     if (current) {
@@ -886,22 +1047,23 @@ export function CareDashboard() {
             <div>
               <div className="eyebrow">Панель ухода</div>
               <h1 className="hero-title">{snapshot.child.name}</h1>
-              <div className="hero-subtitle">
-                {snapshot.child.ageLabel} • семейный журнал здоровья, режима и назначений
-              </div>
             </div>
             <div className="status-pills">
               <div className="theme-switch" aria-label="Тема приложения">
                 <button
                   type="button"
-                  className={theme === "dark" ? "theme-option active" : "theme-option"}
+                  className={
+                    theme === "dark" ? "theme-option active" : "theme-option"
+                  }
                   onClick={() => setTheme("dark")}
                 >
                   Тёмная
                 </button>
                 <button
                   type="button"
-                  className={theme === "light" ? "theme-option active" : "theme-option"}
+                  className={
+                    theme === "light" ? "theme-option active" : "theme-option"
+                  }
                   onClick={() => setTheme("light")}
                 >
                   Светлая
@@ -910,33 +1072,57 @@ export function CareDashboard() {
             </div>
           </div>
 
-          <div className="actor-toggle">
-            {canChangeActor ? (
-              (["mom", "dad"] as ActorId[]).map((actor) => (
-                <button
-                  key={actor}
-                  type="button"
-                  onClick={() => changeActor(actor)}
-                  className={actor === activeActor ? "actor-chip active" : "actor-chip"}
-                >
-                  {actorLabel(actor)}
+          <div className="role-settings-card">
+            <div>
+              <div className="role-settings-title">Профиль родителя</div>
+              <div className="role-settings-copy">
+                {canChangeActor
+                  ? "Выберите один раз. Роль сохранится на этом устройстве."
+                  : "Роль определена по Telegram ID и защищена от смены."}
+              </div>
+            </div>
+            <div className="actor-toggle compact">
+              {canChangeActor ? (
+                (["mom", "dad"] as ActorId[]).map((actor) => (
+                  <button
+                    key={actor}
+                    type="button"
+                    onClick={() => changeActor(actor)}
+                    className={
+                      actor === activeActor ? "actor-chip active" : "actor-chip"
+                    }
+                  >
+                    {actorLabel(actor)}
+                  </button>
+                ))
+              ) : (
+                <button type="button" className="actor-chip active" disabled>
+                  {actorDisplayName}
                 </button>
-              ))
-            ) : (
-              <button type="button" className="actor-chip active" disabled>
-                {actorDisplayName}
-              </button>
-            )}
+              )}
+            </div>
           </div>
           <div className="home-focus-grid">
             <Surface>
-              <InlineMetric label="Кормление" value={snapshot.overview.lastFeeding} helper="последняя запись" />
+              <InlineMetric
+                label="Кормление"
+                value={snapshot.overview.lastFeeding}
+                helper="последняя запись"
+              />
             </Surface>
             <Surface>
-              <InlineMetric label="Сон" value={snapshot.overview.sleepStatus} helper="текущий статус" />
+              <InlineMetric
+                label="Сон"
+                value={snapshot.overview.sleepStatus}
+                helper="текущий статус"
+              />
             </Surface>
             <Surface>
-              <InlineMetric label="Вес и рост" value={latestGrowth?.summary ?? "ещё не измеряли"} helper="последний контроль" />
+              <InlineMetric
+                label="Вес и рост"
+                value={latestGrowth?.summary ?? "ещё не измеряли"}
+                helper="последний контроль"
+              />
             </Surface>
           </div>
         </Card>
@@ -945,18 +1131,51 @@ export function CareDashboard() {
       <section className="dashboard-section">
         <SectionTitle eyebrow="Сейчас" title="Главные показатели" />
         <div className="stats-grid">
-          <StatTile label="Возраст" value={snapshot.overview.age} helper="от 0 мес до 3 лет" accent="#67e8f9" />
-          <StatTile label="Последнее кормление" value={snapshot.overview.lastFeeding} helper="по журналу ухода" accent="#8b5cf6" />
-          <StatTile label="Сон" value={snapshot.overview.sleepStatus} helper="таймер сна активен" accent="#60a5fa" />
-          <StatTile label="Подгузник" value={snapshot.overview.diaperGap} helper="время с последней смены" accent="#f59e0b" />
-          <StatTile label="Температура" value={snapshot.overview.temperature} helper="статистика и тревога" accent="#fb7185" />
-          <StatTile label="Лекарства" value={snapshot.overview.medication} helper="последний приём" accent="#f97316" />
+          <StatTile
+            label="Возраст"
+            value={snapshot.overview.age}
+            helper="от 0 мес до 3 лет"
+            accent="#67e8f9"
+          />
+          <StatTile
+            label="Последнее кормление"
+            value={snapshot.overview.lastFeeding}
+            helper="по журналу ухода"
+            accent="#8b5cf6"
+          />
+          <StatTile
+            label="Сон"
+            value={snapshot.overview.sleepStatus}
+            helper="таймер сна активен"
+            accent="#60a5fa"
+          />
+          <StatTile
+            label="Подгузник"
+            value={snapshot.overview.diaperGap}
+            helper="время с последней смены"
+            accent="#f59e0b"
+          />
+          <StatTile
+            label="Температура"
+            value={snapshot.overview.temperature}
+            helper="статистика и тревога"
+            accent="#fb7185"
+          />
+          <StatTile
+            label="Лекарства"
+            value={snapshot.overview.medication}
+            helper="последний приём"
+            accent="#f97316"
+          />
         </div>
       </section>
 
       <section className="dashboard-section dashboard-two-columns">
         <Card>
-          <SectionTitle eyebrow="Основные действия" title="Одно нажатие ночью" />
+          <SectionTitle
+            eyebrow="Основные действия"
+            title="Одно нажатие ночью"
+          />
           <div className="actions-grid">
             {orderedActions.map((action) => (
               <ActionButton
@@ -975,17 +1194,33 @@ export function CareDashboard() {
           <div className="timers-grid">
             <InlineMetric
               label="Сон идёт"
-              value={snapshot.timers.sleepDurationMinutes ? formatDuration(snapshot.timers.sleepDurationMinutes) : "нет"}
-              helper={snapshot.timers.sleepStartedAt ? `Старт в ${formatTime(snapshot.timers.sleepStartedAt)}` : "ребёнок не спит"}
+              value={
+                snapshot.timers.sleepDurationMinutes
+                  ? formatDuration(snapshot.timers.sleepDurationMinutes)
+                  : "нет"
+              }
+              helper={
+                snapshot.timers.sleepStartedAt
+                  ? `Старт в ${formatTime(snapshot.timers.sleepStartedAt)}`
+                  : "ребёнок не спит"
+              }
             />
             <InlineMetric
               label="Следующее кормление"
-              value={snapshot.timers.nextFeedingAt ? formatTime(snapshot.timers.nextFeedingAt) : "—"}
+              value={
+                snapshot.timers.nextFeedingAt
+                  ? formatTime(snapshot.timers.nextFeedingAt)
+                  : "—"
+              }
               helper="подсказка для напоминаний"
             />
             <InlineMetric
               label="Проверка подгузника"
-              value={snapshot.timers.nextDiaperCheckAt ? formatTime(snapshot.timers.nextDiaperCheckAt) : "—"}
+              value={
+                snapshot.timers.nextDiaperCheckAt
+                  ? formatTime(snapshot.timers.nextDiaperCheckAt)
+                  : "—"
+              }
               helper="на основе последней смены"
             />
           </div>
@@ -994,21 +1229,38 @@ export function CareDashboard() {
 
       <section className="dashboard-section dashboard-two-columns">
         <Card>
-          <SectionTitle eyebrow="Лента семьи" title="Последние действия" action={<GhostButton onClick={() => setActiveTab("feed")}>Вся лента</GhostButton>} />
+          <SectionTitle
+            eyebrow="Лента семьи"
+            title="Последние действия"
+            action={
+              <GhostButton onClick={() => setActiveTab("feed")}>
+                Вся лента
+              </GhostButton>
+            }
+          />
           <div className="timeline-list">
             {snapshot.events.length ? (
-              snapshot.events.slice(0, 4).map((event) => (
-                <TimelineItem
-                  key={event.id}
-                  title={event.summary}
-                  subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}`}
-                  meta={formatDateTime(event.occurredAt)}
-                  accent={accentFromEvent(event.kind)}
-                  action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
-                />
-              ))
+              snapshot.events
+                .slice(0, 4)
+                .map((event) => (
+                  <TimelineItem
+                    key={event.id}
+                    title={event.summary}
+                    subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}`}
+                    meta={formatDateTime(event.occurredAt)}
+                    accent={accentFromEvent(event.kind)}
+                    action={
+                      <GhostButton onClick={() => openEditSheet(event)}>
+                        Исправить
+                      </GhostButton>
+                    }
+                  />
+                ))
             ) : (
-              <EmptyState title="Лента пока пустая" description="Здесь появятся только реальные действия мамы и папы." />
+              <EmptyState
+                title="Лента пока пустая"
+                description="Здесь появятся только реальные действия мамы и папы."
+              />
             )}
           </div>
         </Card>
@@ -1018,18 +1270,33 @@ export function CareDashboard() {
           <div className="stack-list">
             {snapshot.reminders.length ? (
               snapshot.reminders.map((reminder) => (
-                <Surface key={reminder.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+                <Surface
+                  key={reminder.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                  }}
+                >
                   <div>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{reminder.title}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>
+                      {reminder.title}
+                    </div>
                     <div style={{ marginTop: 4, color: "var(--muted-strong)" }}>
-                      {reminder.channel === "bot" ? "Придёт в Telegram боте" : "Покажется в Mini App"}
+                      {reminder.channel === "bot"
+                        ? "Придёт в Telegram боте"
+                        : "Покажется в Mini App"}
                     </div>
                   </div>
                   <Pill tone={reminder.tone}>{reminder.dueLabel}</Pill>
                 </Surface>
               ))
             ) : (
-              <EmptyState title="Напоминаний пока нет" description="Они появятся после первых кормлений, подгузников или лекарств." />
+              <EmptyState
+                title="Напоминаний пока нет"
+                description="Они появятся после первых кормлений, подгузников или лекарств."
+              />
             )}
           </div>
         </Card>
@@ -1040,7 +1307,10 @@ export function CareDashboard() {
   const renderLog = () => (
     <section className="dashboard-section">
       <Card>
-        <SectionTitle eyebrow="Запись событий" title="Минимум ввода, максимум скорости" />
+        <SectionTitle
+          eyebrow="Запись событий"
+          title="Минимум ввода, максимум скорости"
+        />
         <div className="actions-grid">
           {orderedActions.map((action) => (
             <ActionButton
@@ -1066,7 +1336,11 @@ export function CareDashboard() {
               <button
                 key={option.id}
                 type="button"
-                className={feedKindFilter === option.id ? "filter-chip active" : "filter-chip"}
+                className={
+                  feedKindFilter === option.id
+                    ? "filter-chip active"
+                    : "filter-chip"
+                }
                 onClick={() => setFeedKindFilter(option.id)}
               >
                 {option.label}
@@ -1078,7 +1352,11 @@ export function CareDashboard() {
               <button
                 key={option.id}
                 type="button"
-                className={feedActorFilter === option.id ? "filter-chip active" : "filter-chip"}
+                className={
+                  feedActorFilter === option.id
+                    ? "filter-chip active"
+                    : "filter-chip"
+                }
                 onClick={() => setFeedActorFilter(option.id)}
               >
                 {option.label}
@@ -1096,19 +1374,34 @@ export function CareDashboard() {
                 </div>
                 {group.events.map((event) => (
                   <Surface key={event.id} className="feed-card">
-                    <div className="feed-card-icon" style={{ background: accentFromEvent(event.kind) }}>{eventIcon(event.kind)}</div>
+                    <div
+                      className="feed-card-icon"
+                      style={{ background: accentFromEvent(event.kind) }}
+                    >
+                      {eventIcon(event.kind)}
+                    </div>
                     <div className="feed-card-main">
                       <div className="feed-card-top">
                         <div>
                           <div className="feed-card-title">{event.summary}</div>
                           <div className="feed-card-meta">
-                            {actorLabel(event.actor)} • {eventKindLabel(event.kind)} • {formatDateTime(event.occurredAt)}
+                            {actorLabel(event.actor)} •{" "}
+                            {eventKindLabel(event.kind)} •{" "}
+                            {formatDateTime(event.occurredAt)}
                           </div>
                         </div>
-                        <GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>
+                        <GhostButton onClick={() => openEditSheet(event)}>
+                          Исправить
+                        </GhostButton>
                       </div>
                       <div className="feed-card-badges">
-                        <Pill tone={toneFromEvent(event)}>{event.editedAt ? "Исправлено" : event.source === "local" ? "Синхронизация" : "Сохранено"}</Pill>
+                        <Pill tone={toneFromEvent(event)}>
+                          {event.editedAt
+                            ? "Исправлено"
+                            : event.source === "local"
+                              ? "Синхронизация"
+                              : "Сохранено"}
+                        </Pill>
                       </div>
                     </div>
                   </Surface>
@@ -1116,7 +1409,10 @@ export function CareDashboard() {
               </div>
             ))
           ) : (
-            <EmptyState title="Событий по фильтру нет" description="Измените фильтр или добавьте новую запись в лог." />
+            <EmptyState
+              title="Событий по фильтру нет"
+              description="Измените фильтр или добавьте новую запись в лог."
+            />
           )}
         </div>
       </Card>
@@ -1132,7 +1428,11 @@ export function CareDashboard() {
             <button
               key={summary.id}
               type="button"
-              className={summaryPeriodId === summary.id ? "period-tab active" : "period-tab"}
+              className={
+                summaryPeriodId === summary.id
+                  ? "period-tab active"
+                  : "period-tab"
+              }
               onClick={() => setSummaryPeriodId(summary.id)}
             >
               {summary.title}
@@ -1142,26 +1442,66 @@ export function CareDashboard() {
         <div className="metrics-grid">
           {summaryMetrics.map((metric) => (
             <Surface key={metric.label} style={{ minHeight: 120 }}>
-              <InlineMetric label={metric.label} value={metric.value} helper={metric.helper} />
+              <InlineMetric
+                label={metric.label}
+                value={metric.value}
+                helper={metric.helper}
+              />
             </Surface>
           ))}
         </div>
       </Card>
 
       <Card>
-        <SectionTitle eyebrow="Наблюдения" title="Подсказки по режиму" action={<GhostButton onClick={() => void refreshAi()}>Обновить</GhostButton>} />
+        <SectionTitle
+          eyebrow="Наблюдения"
+          title="Подсказки по режиму"
+          action={
+            <GhostButton onClick={() => void refreshAi()}>Обновить</GhostButton>
+          }
+        />
         <div className="stack-list">
           <Surface>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Короткий ответ</div>
-            <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>{aiAnswer}</div>
+            <div
+              style={{
+                marginTop: 8,
+                color: "var(--muted-strong)",
+                lineHeight: 1.6,
+              }}
+            >
+              {aiAnswer}
+            </div>
           </Surface>
           {snapshot.insights.map((insight) => (
             <Surface key={insight.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{insight.title}</div>
-                <Pill tone={insight.tone}>{insight.tone === "danger" ? "Внимание" : insight.tone === "warn" ? "Следить" : "Норма"}</Pill>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {insight.title}
+                </div>
+                <Pill tone={insight.tone}>
+                  {insight.tone === "danger"
+                    ? "Внимание"
+                    : insight.tone === "warn"
+                      ? "Следить"
+                      : "Норма"}
+                </Pill>
               </div>
-              <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>{insight.body}</div>
+              <div
+                style={{
+                  marginTop: 8,
+                  color: "var(--muted-strong)",
+                  lineHeight: 1.6,
+                }}
+              >
+                {insight.body}
+              </div>
             </Surface>
           ))}
         </div>
@@ -1181,7 +1521,11 @@ export function CareDashboard() {
                 <button
                   key={summary.id}
                   type="button"
-                  className={exportPeriodId === summary.id ? "filter-chip active" : "filter-chip"}
+                  className={
+                    exportPeriodId === summary.id
+                      ? "filter-chip active"
+                      : "filter-chip"
+                  }
                   onClick={() => setExportPeriodId(summary.id)}
                 >
                   {summary.title}
@@ -1196,7 +1540,11 @@ export function CareDashboard() {
                 <button
                   key={option.id}
                   type="button"
-                  className={exportKindFilter === option.id ? "filter-chip active" : "filter-chip"}
+                  className={
+                    exportKindFilter === option.id
+                      ? "filter-chip active"
+                      : "filter-chip"
+                  }
                   onClick={() => setExportKindFilter(option.id)}
                 >
                   {option.label}
@@ -1211,7 +1559,11 @@ export function CareDashboard() {
                 <button
                   key={option.id}
                   type="button"
-                  className={exportActorFilter === option.id ? "filter-chip active" : "filter-chip"}
+                  className={
+                    exportActorFilter === option.id
+                      ? "filter-chip active"
+                      : "filter-chip"
+                  }
                   onClick={() => setExportActorFilter(option.id)}
                 >
                   {option.label}
@@ -1223,38 +1575,77 @@ export function CareDashboard() {
         <div className="stack-list">
           <Surface>
             <div style={{ fontSize: 18, fontWeight: 700 }}>PDF</div>
-            <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              Аккуратная сводка по периодам, текущему статусу и событиям для врача.
+            <div
+              style={{
+                marginTop: 8,
+                color: "var(--muted-strong)",
+                lineHeight: 1.6,
+              }}
+            >
+              Аккуратная сводка по периодам, текущему статусу и событиям для
+              врача.
             </div>
             <div style={{ marginTop: 16 }}>
-              <PrimaryButton onClick={() => void downloadExport("pdf", exportFilters)}>Скачать PDF</PrimaryButton>
+              <PrimaryButton
+                onClick={() => void downloadExport("pdf", exportFilters)}
+              >
+                Скачать PDF
+              </PrimaryButton>
             </div>
           </Surface>
           <Surface>
             <div style={{ fontSize: 18, fontWeight: 700 }}>CSV</div>
-            <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              CSV с периодами, событиями, родителем, временем и деталями для анализа.
+            <div
+              style={{
+                marginTop: 8,
+                color: "var(--muted-strong)",
+                lineHeight: 1.6,
+              }}
+            >
+              CSV с периодами, событиями, родителем, временем и деталями для
+              анализа.
             </div>
             <div style={{ marginTop: 16 }}>
-              <PrimaryButton onClick={() => void downloadExport("csv", exportFilters)}>Скачать CSV</PrimaryButton>
+              <PrimaryButton
+                onClick={() => void downloadExport("csv", exportFilters)}
+              >
+                Скачать CSV
+              </PrimaryButton>
             </div>
           </Surface>
         </div>
       </Card>
 
       <Card>
-        <SectionTitle eyebrow="Риски и статус" title="Что важно помнить сейчас" />
+        <SectionTitle
+          eyebrow="Риски и статус"
+          title="Что важно помнить сейчас"
+        />
         <div className="stack-list">
           <Surface>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Оффлайн-режим</div>
-            <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              Даже без сети новые события не теряются: они сохраняются локально и уйдут в синхронизацию при следующем подключении.
+            <div
+              style={{
+                marginTop: 8,
+                color: "var(--muted-strong)",
+                lineHeight: 1.6,
+              }}
+            >
+              Даже без сети новые события не теряются: они сохраняются локально
+              и уйдут в синхронизацию при следующем подключении.
             </div>
           </Surface>
           <Surface>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Текущая очередь</div>
-            <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              В ожидании отправки: {pendingCount}. Онлайн-статус: {online ? "есть сеть" : "нет сети"}.
+            <div
+              style={{
+                marginTop: 8,
+                color: "var(--muted-strong)",
+                lineHeight: 1.6,
+              }}
+            >
+              В ожидании отправки: {pendingCount}. Онлайн-статус:{" "}
+              {online ? "есть сеть" : "нет сети"}.
             </div>
           </Surface>
         </div>
@@ -1275,7 +1666,9 @@ export function CareDashboard() {
       case "export":
         return renderExport();
       default:
-        return <EmptyState title="Пусто" description="Выберите раздел снизу." />;
+        return (
+          <EmptyState title="Пусто" description="Выберите раздел снизу." />
+        );
     }
   };
 
@@ -1290,14 +1683,29 @@ export function CareDashboard() {
       {renderActiveTab()}
 
       <div style={{ height: 18 }} />
-      <BottomTabs items={tabs} activeId={activeTab} onChange={(value) => setActiveTab(value as TabId)} />
+      <BottomTabs
+        items={tabs}
+        activeId={activeTab}
+        onChange={(value) => setActiveTab(value as TabId)}
+      />
 
       {currentAction && currentPreset ? (
-        <div className="sheet-backdrop" role="presentation" onClick={closeSheet}>
-          <div className="sheet-panel" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="sheet-backdrop"
+          role="presentation"
+          onClick={closeSheet}
+        >
+          <div
+            className="sheet-panel"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="sheet-header">
               <div>
-                <div className="eyebrow">{editingEvent ? "Исправление" : "Новая запись"}</div>
+                <div className="eyebrow">
+                  {editingEvent ? "Исправление" : "Новая запись"}
+                </div>
                 <h3>{currentAction.title}</h3>
               </div>
               <GhostButton onClick={closeSheet}>Закрыть</GhostButton>
@@ -1311,13 +1719,23 @@ export function CareDashboard() {
                       key={actor}
                       type="button"
                       onClick={() => {
-                        const nextPreset = currentAction ? getActionPresets(currentAction, actor, snapshot.events)[0] : undefined;
+                        const nextPreset = currentAction
+                          ? getActionPresets(
+                              currentAction,
+                              actor,
+                              snapshot.quickItems,
+                            )[0]
+                          : undefined;
                         setSheetActor(actor);
                         setSelectedPresetId(nextPreset?.id ?? "");
                         setInputValue(nextPreset?.defaultInput ?? "");
                         setFieldValues(getDefaultFieldValues(nextPreset));
                       }}
-                      className={actor === sheetActor ? "actor-chip active" : "actor-chip"}
+                      className={
+                        actor === sheetActor
+                          ? "actor-chip active"
+                          : "actor-chip"
+                      }
                     >
                       {actorLabel(actor)}
                     </button>
@@ -1332,25 +1750,54 @@ export function CareDashboard() {
 
             <div className="preset-list">
               {currentPresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={preset.id === selectedPresetId ? "preset-card active" : "preset-card"}
-                  onClick={() => {
-                    setSelectedPresetId(preset.id);
-                    setInputValue(preset.defaultInput ?? "");
-                    setFieldValues(getDefaultFieldValues(preset));
-                  }}
-                >
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{preset.label}</div>
-                  <div style={{ marginTop: 6, color: "var(--muted-strong)", lineHeight: 1.5 }}>{preset.helper}</div>
-                </button>
+                <div key={preset.id} className="preset-row">
+                  <button
+                    type="button"
+                    className={
+                      preset.id === selectedPresetId
+                        ? "preset-card active"
+                        : "preset-card"
+                    }
+                    onClick={() => {
+                      setSelectedPresetId(preset.id);
+                      setInputValue(preset.defaultInput ?? "");
+                      setFieldValues(getDefaultFieldValues(preset));
+                    }}
+                  >
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>
+                      {preset.label}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 6,
+                        color: "var(--muted-strong)",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {preset.helper}
+                    </div>
+                  </button>
+                  {preset.quickItem ? (
+                    <button
+                      type="button"
+                      className="quick-delete-button"
+                      aria-label={`Удалить ${preset.label}`}
+                      onClick={() => void handleDeleteQuickItem(preset)}
+                    >
+                      Удалить
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
 
             <label className="field">
               <span>Время</span>
-              <input type="time" value={timeValue} onChange={(event) => setTimeValue(event.target.value)} />
+              <input
+                type="time"
+                value={timeValue}
+                onChange={(event) => setTimeValue(event.target.value)}
+              />
             </label>
 
             {currentPreset.inputLabel ? (
@@ -1387,8 +1834,15 @@ export function CareDashboard() {
             ) : null}
 
             <div className="sheet-footer">
-              <PrimaryButton disabled={submitting} onClick={() => void handleSubmit()}>
-                {submitting ? "Сохраняю…" : editingEvent ? "Сохранить исправление" : "Добавить событие"}
+              <PrimaryButton
+                disabled={submitting}
+                onClick={() => void handleSubmit()}
+              >
+                {submitting
+                  ? "Сохраняю…"
+                  : editingEvent
+                    ? "Сохранить исправление"
+                    : "Добавить событие"}
               </PrimaryButton>
             </div>
           </div>

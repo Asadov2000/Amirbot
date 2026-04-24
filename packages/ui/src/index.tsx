@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, PropsWithChildren, ReactNode } from "react";
+import type {
+  ButtonHTMLAttributes,
+  CSSProperties,
+  HTMLAttributes,
+  PropsWithChildren,
+  ReactNode,
+} from "react";
 
 const styles = {
   card: {
@@ -6,6 +12,7 @@ const styles = {
     borderRadius: 24,
     background: "var(--card-bg)",
     boxShadow: "var(--shadow)",
+    backdropFilter: "blur(22px)",
   } satisfies CSSProperties,
   surface: {
     borderRadius: 22,
@@ -19,11 +26,15 @@ const styles = {
   } satisfies CSSProperties,
 };
 
-function mergeStyles(...parts: Array<CSSProperties | undefined>): CSSProperties {
+function mergeStyles(
+  ...parts: Array<CSSProperties | undefined>
+): CSSProperties {
   return Object.assign({}, ...parts);
 }
 
-export function cn(...values: Array<string | false | null | undefined>): string {
+export function cn(
+  ...values: Array<string | false | null | undefined>
+): string {
   return values.filter(Boolean).join(" ");
 }
 
@@ -34,7 +45,11 @@ export function Card({
   ...props
 }: PropsWithChildren<HTMLAttributes<HTMLDivElement>>) {
   return (
-    <div {...props} className={className} style={mergeStyles(styles.card, { padding: 20 }, style)}>
+    <div
+      {...props}
+      className={className}
+      style={mergeStyles(styles.card, { padding: 20 }, style)}
+    >
       {children}
     </div>
   );
@@ -47,7 +62,11 @@ export function Surface({
   ...props
 }: PropsWithChildren<HTMLAttributes<HTMLDivElement>>) {
   return (
-    <div {...props} className={className} style={mergeStyles(styles.surface, { padding: 16 }, style)}>
+    <div
+      {...props}
+      className={className}
+      style={mergeStyles(styles.surface, { padding: 16 }, style)}
+    >
       {children}
     </div>
   );
@@ -74,7 +93,14 @@ export function SectionTitle({
     >
       <div>
         {eyebrow ? (
-          <div style={{ fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)" }}>
+          <div
+            style={{
+              fontSize: 12,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
+          >
             {eyebrow}
           </div>
         ) : null}
@@ -108,8 +134,20 @@ export function StatTile({
       }}
     >
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
-      <div style={{ fontSize: "clamp(1.5rem, 4vw, 2.2rem)", fontWeight: 800, lineHeight: 1 }}>{value}</div>
-      {helper ? <div style={{ color: "var(--muted-strong)", fontSize: 13 }}>{helper}</div> : null}
+      <div
+        style={{
+          fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
+          fontWeight: 800,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      {helper ? (
+        <div style={{ color: "var(--muted-strong)", fontSize: 13 }}>
+          {helper}
+        </div>
+      ) : null}
     </Surface>
   );
 }
@@ -144,14 +182,18 @@ export function ActionButton({
           cursor: "pointer",
           background: selected
             ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), color-mix(in srgb, var(--accent-2) 16%, var(--surface)))"
-            : "var(--surface)",
+            : "linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 74%, transparent))",
           transform: selected ? "translateY(-1px)" : "none",
-          transition: "transform 160ms ease, background 160ms ease, border-color 160ms ease",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+          transition:
+            "transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
         },
         style,
       )}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 12 }}
+      >
         <span style={{ fontSize: 26, lineHeight: 1 }}>{icon}</span>
         <span
           style={{
@@ -166,7 +208,13 @@ export function ActionButton({
       </div>
       <div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
-        {subtitle ? <div style={{ marginTop: 4, color: "var(--muted-strong)", fontSize: 13 }}>{subtitle}</div> : null}
+        {subtitle ? (
+          <div
+            style={{ marginTop: 4, color: "var(--muted-strong)", fontSize: 13 }}
+          >
+            {subtitle}
+          </div>
+        ) : null}
       </div>
     </button>
   );
@@ -177,7 +225,10 @@ export function Pill({
   tone = "default",
 }: PropsWithChildren<{ tone?: "default" | "good" | "warn" | "danger" }>) {
   const palette: Record<string, CSSProperties> = {
-    default: { background: "var(--surface-strong)", color: "var(--muted-strong)" },
+    default: {
+      background: "var(--surface-strong)",
+      color: "var(--muted-strong)",
+    },
     good: { background: "var(--good-soft)", color: "var(--good-text)" },
     warn: { background: "var(--warn-soft)", color: "var(--warn-text)" },
     danger: { background: "var(--danger-soft)", color: "var(--danger-text)" },
@@ -211,7 +262,11 @@ export function InlineMetric({
     <div style={{ display: "grid", gap: 4 }}>
       <div style={{ color: "var(--muted)", fontSize: 13 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800 }}>{value}</div>
-      {helper ? <div style={{ color: "var(--muted-strong)", fontSize: 13 }}>{helper}</div> : null}
+      {helper ? (
+        <div style={{ color: "var(--muted-strong)", fontSize: 13 }}>
+          {helper}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -250,7 +305,9 @@ export function TimelineItem({
       />
       <div style={{ display: "grid", gap: 5 }}>
         <div style={{ fontWeight: 700, fontSize: 16 }}>{title}</div>
-        <div style={{ color: "var(--muted-strong)", fontSize: 14 }}>{subtitle}</div>
+        <div style={{ color: "var(--muted-strong)", fontSize: 14 }}>
+          {subtitle}
+        </div>
       </div>
       <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
         <div style={{ color: "var(--muted)", fontSize: 13 }}>{meta}</div>
@@ -274,7 +331,7 @@ export function GhostButton({
           padding: "10px 14px",
           color: "inherit",
           cursor: "pointer",
-          background: "rgba(255,255,255,0.04)",
+          background: "color-mix(in srgb, var(--surface) 82%, transparent)",
         },
         style,
       )}
@@ -299,11 +356,13 @@ export function PrimaryButton({
           minHeight: 58,
           padding: "14px 18px",
           color: "var(--primary-text)",
-          background: "linear-gradient(135deg, var(--accent), var(--accent-2) 60%, var(--accent-3))",
+          background:
+            "linear-gradient(135deg, var(--accent), var(--accent-2) 60%, var(--accent-3))",
           fontSize: 16,
           fontWeight: 800,
           cursor: "pointer",
-          boxShadow: "0 18px 34px color-mix(in srgb, var(--accent) 18%, transparent)",
+          boxShadow:
+            "0 18px 34px color-mix(in srgb, var(--accent) 18%, transparent)",
         },
         style,
       )}
@@ -352,7 +411,9 @@ export function BottomTabs({
               border: "none",
               minHeight: 58,
               borderRadius: 20,
-              background: active ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "transparent",
+              background: active
+                ? "color-mix(in srgb, var(--accent) 18%, transparent)"
+                : "transparent",
               color: active ? "var(--text)" : "var(--muted)",
               fontWeight: active ? 700 : 600,
               display: "grid",
@@ -388,8 +449,12 @@ export function EmptyState({
       }}
     >
       <div style={{ maxWidth: 320 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>{title}</div>
-        <div style={{ color: "var(--muted-strong)", lineHeight: 1.5 }}>{description}</div>
+        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
+          {title}
+        </div>
+        <div style={{ color: "var(--muted-strong)", lineHeight: 1.5 }}>
+          {description}
+        </div>
       </div>
     </Surface>
   );

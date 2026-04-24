@@ -1,4 +1,11 @@
-import { actorLabel, calculateAgeLabel, formatDueLabel, formatDuration, formatRelativeFromNow } from "./format";
+import {
+  actorLabel,
+  calculateAgeLabel,
+  formatDueLabel,
+  formatDuration,
+  formatRelativeFromNow,
+} from "./format";
+import { buildQuickItemKey, normalizeQuickItemLabel } from "./quick-items";
 import type {
   AiInsight,
   CareEventRecord,
@@ -6,6 +13,7 @@ import type {
   DailySummary,
   EventDraft,
   PeriodSummary,
+  QuickItemRecord,
   ReminderCard,
   SummaryPeriodId,
 } from "./types";
@@ -26,7 +34,11 @@ function baseEvents(): CareEventRecord[] {
   return [];
 }
 
-const SUMMARY_PERIODS: Array<{ id: SummaryPeriodId; title: string; days: number | null }> = [
+const SUMMARY_PERIODS: Array<{
+  id: SummaryPeriodId;
+  title: string;
+  days: number | null;
+}> = [
   { id: "1d", title: "1 день", days: 1 },
   { id: "3d", title: "3 дня", days: 3 },
   { id: "7d", title: "Неделя", days: 7 },
@@ -46,28 +58,52 @@ function periodStart(days: number | null): number {
   return start.getTime();
 }
 
-function getSummary(events: CareEventRecord[], days: number | null = 1): DailySummary {
-  const periodEvents = events.filter((event) => new Date(event.occurredAt).getTime() >= periodStart(days));
-  const feedingEvents = periodEvents.filter((event) => event.kind === "FEEDING");
+function getSummary(
+  events: CareEventRecord[],
+  days: number | null = 1,
+): DailySummary {
+  const periodEvents = events.filter(
+    (event) => new Date(event.occurredAt).getTime() >= periodStart(days),
+  );
+  const feedingEvents = periodEvents.filter(
+    (event) => event.kind === "FEEDING",
+  );
   const diaperEvents = periodEvents.filter((event) => event.kind === "DIAPER");
   const sleepStarts = periodEvents
-    .filter((event) => event.kind === "SLEEP" && event.payload.phase === "START")
-    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
+    .filter(
+      (event) => event.kind === "SLEEP" && event.payload.phase === "START",
+    )
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
   const sleepEnds = periodEvents
     .filter((event) => event.kind === "SLEEP" && event.payload.phase === "END")
-    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
 
   let totalSleepMinutes = 0;
   sleepStarts.forEach((start, index) => {
     const end = sleepEnds[index];
     if (!end) {
-      totalSleepMinutes += Math.max(0, Math.round((Date.now() - new Date(start.occurredAt).getTime()) / 60000));
+      totalSleepMinutes += Math.max(
+        0,
+        Math.round((Date.now() - new Date(start.occurredAt).getTime()) / 60000),
+      );
       return;
     }
 
     totalSleepMinutes += Math.max(
       0,
-      Math.round((new Date(end.occurredAt).getTime() - new Date(start.occurredAt).getTime()) / 60000),
+      Math.round(
+        (new Date(end.occurredAt).getTime() -
+          new Date(start.occurredAt).getTime()) /
+          60000,
+      ),
     );
   });
 
@@ -75,7 +111,8 @@ function getSummary(events: CareEventRecord[], days: number | null = 1): DailySu
   for (let index = 1; index < feedingEvents.length; index += 1) {
     intervalSum += Math.abs(
       Math.round(
-        (new Date(feedingEvents[index - 1].occurredAt).getTime() - new Date(feedingEvents[index].occurredAt).getTime()) /
+        (new Date(feedingEvents[index - 1].occurredAt).getTime() -
+          new Date(feedingEvents[index].occurredAt).getTime()) /
           60000,
       ),
     );
@@ -87,16 +124,29 @@ function getSummary(events: CareEventRecord[], days: number | null = 1): DailySu
       month: "long",
     }).format(new Date()),
     feedingsCount: feedingEvents.length,
-    solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD").length,
+    solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD")
+      .length,
     totalSleepMinutes,
     averageFeedingIntervalMinutes:
-      feedingEvents.length > 1 ? Math.round(intervalSum / (feedingEvents.length - 1)) : 0,
-    diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET").length,
-    diaperDirtyCount: diaperEvents.filter((event) => event.payload.type === "DIRTY").length,
-    diaperMixedCount: diaperEvents.filter((event) => event.payload.type === "MIXED").length,
-    temperatureReadingsCount: periodEvents.filter((event) => event.kind === "TEMPERATURE").length,
-    medicationsCount: periodEvents.filter((event) => event.kind === "MEDICATION").length,
-    growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH").length,
+      feedingEvents.length > 1
+        ? Math.round(intervalSum / (feedingEvents.length - 1))
+        : 0,
+    diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET")
+      .length,
+    diaperDirtyCount: diaperEvents.filter(
+      (event) => event.payload.type === "DIRTY",
+    ).length,
+    diaperMixedCount: diaperEvents.filter(
+      (event) => event.payload.type === "MIXED",
+    ).length,
+    temperatureReadingsCount: periodEvents.filter(
+      (event) => event.kind === "TEMPERATURE",
+    ).length,
+    medicationsCount: periodEvents.filter(
+      (event) => event.kind === "MEDICATION",
+    ).length,
+    growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH")
+      .length,
   };
 }
 
@@ -115,29 +165,41 @@ function getReminders(events: CareEventRecord[]): ReminderCard[] {
   const reminders: ReminderCard[] = [];
 
   if (lastFeed) {
-    const dueAt = new Date(new Date(lastFeed.occurredAt).getTime() + 3 * 60 * 60_000).toISOString();
+    const dueAt = new Date(
+      new Date(lastFeed.occurredAt).getTime() + 3 * 60 * 60_000,
+    ).toISOString();
     reminders.push({
       id: "reminder_feeding",
       title: "Следующее кормление",
       dueLabel: formatDueLabel(dueAt),
-      tone: new Date(dueAt).getTime() - Date.now() < 30 * 60_000 ? "warn" : "default",
+      tone:
+        new Date(dueAt).getTime() - Date.now() < 30 * 60_000
+          ? "warn"
+          : "default",
       channel: "bot",
     });
   }
 
   if (lastDiaper) {
-    const dueAt = new Date(new Date(lastDiaper.occurredAt).getTime() + 2 * 60 * 60_000).toISOString();
+    const dueAt = new Date(
+      new Date(lastDiaper.occurredAt).getTime() + 2 * 60 * 60_000,
+    ).toISOString();
     reminders.push({
       id: "reminder_diaper",
       title: "Проверка подгузника",
       dueLabel: formatDueLabel(dueAt),
-      tone: new Date(dueAt).getTime() - Date.now() < 20 * 60_000 ? "warn" : "default",
+      tone:
+        new Date(dueAt).getTime() - Date.now() < 20 * 60_000
+          ? "warn"
+          : "default",
       channel: "bot",
     });
   }
 
   if (lastMedication) {
-    const dueAt = new Date(new Date(lastMedication.occurredAt).getTime() + 12 * 60 * 60_000).toISOString();
+    const dueAt = new Date(
+      new Date(lastMedication.occurredAt).getTime() + 12 * 60 * 60_000,
+    ).toISOString();
     reminders.push({
       id: "reminder_medication",
       title: "Следующая доза по графику",
@@ -148,6 +210,61 @@ function getReminders(events: CareEventRecord[]): ReminderCard[] {
   }
 
   return reminders;
+}
+
+function quickItemsFromRecords(events: CareEventRecord[]): QuickItemRecord[] {
+  const items = new Map<string, QuickItemRecord>();
+
+  [...events]
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    )
+    .forEach((event) => {
+      if (event.kind === "SOLID_FOOD") {
+        const label = normalizeQuickItemLabel(
+          String(event.payload.food ?? event.payload.note ?? ""),
+        );
+        if (!label || label === "Прикорм") {
+          return;
+        }
+
+        const key = buildQuickItemKey("SOLID_FOOD", label);
+        items.set(key, {
+          kind: "SOLID_FOOD",
+          key,
+          label,
+          updatedAt: event.occurredAt,
+        });
+      }
+
+      if (event.kind === "MEDICATION") {
+        const label = normalizeQuickItemLabel(
+          String(event.payload.medication ?? ""),
+        );
+        if (!label || label === "Лекарство") {
+          return;
+        }
+
+        const detail = normalizeQuickItemLabel(
+          String(event.payload.dose ?? ""),
+        );
+        const key = buildQuickItemKey("MEDICATION", label);
+        items.set(key, {
+          kind: "MEDICATION",
+          key,
+          label,
+          detail: detail && detail !== "без дозы" ? detail : undefined,
+          updatedAt: event.occurredAt,
+        });
+      }
+    });
+
+  return Array.from(items.values()).sort(
+    (left, right) =>
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
 }
 
 export function getInsights(snapshot: DashboardSnapshot): AiInsight[] {
@@ -163,7 +280,9 @@ export function getInsights(snapshot: DashboardSnapshot): AiInsight[] {
   }
 
   const lastFeed = snapshot.events.find((event) => event.kind === "FEEDING");
-  const temperatureEvent = snapshot.events.find((event) => event.kind === "TEMPERATURE");
+  const temperatureEvent = snapshot.events.find(
+    (event) => event.kind === "TEMPERATURE",
+  );
 
   const insights: AiInsight[] = [
     {
@@ -192,7 +311,10 @@ export function getInsights(snapshot: DashboardSnapshot): AiInsight[] {
     });
   }
 
-  if (temperatureEvent && Number(temperatureEvent.payload.temperatureC ?? 0) >= 37.5) {
+  if (
+    temperatureEvent &&
+    Number(temperatureEvent.payload.temperatureC ?? 0) >= 37.5
+  ) {
     insights.push({
       id: "insight_temperature",
       title: "Температура под контролем",
@@ -211,23 +333,39 @@ export function buildSnapshotFromEvents(
     name: "Амир",
     birthDate: CHILD_BIRTH_DATE,
   },
+  quickItems: QuickItemRecord[] = quickItemsFromRecords(events),
 ): DashboardSnapshot {
   const sortedEvents = [...events].sort(
-    (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
+    (left, right) =>
+      new Date(right.occurredAt).getTime() -
+      new Date(left.occurredAt).getTime(),
   );
 
   const lastFeed = sortedEvents.find((event) => event.kind === "FEEDING");
-  const lastSleepStart = sortedEvents.find((event) => event.kind === "SLEEP" && event.payload.phase === "START");
-  const lastSleepEnd = sortedEvents.find((event) => event.kind === "SLEEP" && event.payload.phase === "END");
+  const lastSleepStart = sortedEvents.find(
+    (event) => event.kind === "SLEEP" && event.payload.phase === "START",
+  );
+  const lastSleepEnd = sortedEvents.find(
+    (event) => event.kind === "SLEEP" && event.payload.phase === "END",
+  );
   const lastDiaper = sortedEvents.find((event) => event.kind === "DIAPER");
   const lastTemp = sortedEvents.find((event) => event.kind === "TEMPERATURE");
-  const lastMedication = sortedEvents.find((event) => event.kind === "MEDICATION");
+  const lastMedication = sortedEvents.find(
+    (event) => event.kind === "MEDICATION",
+  );
 
   const sleeping =
     lastSleepStart &&
-    (!lastSleepEnd || new Date(lastSleepStart.occurredAt).getTime() > new Date(lastSleepEnd.occurredAt).getTime());
+    (!lastSleepEnd ||
+      new Date(lastSleepStart.occurredAt).getTime() >
+        new Date(lastSleepEnd.occurredAt).getTime());
   const sleepDurationMinutes = sleeping
-    ? Math.max(1, Math.round((Date.now() - new Date(lastSleepStart.occurredAt).getTime()) / 60000))
+    ? Math.max(
+        1,
+        Math.round(
+          (Date.now() - new Date(lastSleepStart.occurredAt).getTime()) / 60000,
+        ),
+      )
     : undefined;
 
   const snapshot: DashboardSnapshot = {
@@ -240,25 +378,38 @@ export function buildSnapshotFromEvents(
     },
     overview: {
       age: calculateAgeLabel(child.birthDate),
-      lastFeeding: lastFeed ? `${formatRelativeFromNow(lastFeed.occurredAt)} · ${lastFeed.summary}` : "ещё не логировали",
-      sleepStatus: sleeping ? `Спит ${formatDuration(sleepDurationMinutes)}` : "Сейчас бодрствует",
-      diaperGap: lastDiaper ? formatRelativeFromNow(lastDiaper.occurredAt) : "ещё не логировали",
+      lastFeeding: lastFeed
+        ? `${formatRelativeFromNow(lastFeed.occurredAt)} · ${lastFeed.summary}`
+        : "ещё не логировали",
+      sleepStatus: sleeping
+        ? `Спит ${formatDuration(sleepDurationMinutes)}`
+        : "Сейчас бодрствует",
+      diaperGap: lastDiaper
+        ? formatRelativeFromNow(lastDiaper.occurredAt)
+        : "ещё не логировали",
       temperature: lastTemp ? lastTemp.summary : "сегодня без измерений",
-      medication: lastMedication ? `${lastMedication.summary} · ${formatRelativeFromNow(lastMedication.occurredAt)}` : "лекарств не было",
+      medication: lastMedication
+        ? `${lastMedication.summary} · ${formatRelativeFromNow(lastMedication.occurredAt)}`
+        : "лекарств не было",
     },
     reminders: [],
     timers: {
       sleepStartedAt: sleeping ? lastSleepStart.occurredAt : undefined,
       sleepDurationMinutes,
       nextFeedingAt: lastFeed
-        ? new Date(new Date(lastFeed.occurredAt).getTime() + 3 * 60 * 60_000).toISOString()
+        ? new Date(
+            new Date(lastFeed.occurredAt).getTime() + 3 * 60 * 60_000,
+          ).toISOString()
         : undefined,
       nextDiaperCheckAt: lastDiaper
-        ? new Date(new Date(lastDiaper.occurredAt).getTime() + 2 * 60 * 60_000).toISOString()
+        ? new Date(
+            new Date(lastDiaper.occurredAt).getTime() + 2 * 60 * 60_000,
+          ).toISOString()
         : undefined,
     },
     summary: getSummary(sortedEvents),
     periodSummaries: getPeriodSummaries(sortedEvents),
+    quickItems,
     events: sortedEvents,
     insights: [],
   };
@@ -276,7 +427,10 @@ export function createBaseSnapshot(): DashboardSnapshot {
   });
 }
 
-export function createEventRecord(draft: EventDraft, source: "server" | "local" = "local"): CareEventRecord {
+export function createEventRecord(
+  draft: EventDraft,
+  source: "server" | "local" = "local",
+): CareEventRecord {
   return {
     id: createId("evt"),
     idempotencyKey: createId("idem"),
@@ -302,10 +456,37 @@ export function mergeSnapshot(
     deduped.set(key, { ...event, ...(overrides[event.id] ?? {}) });
   });
 
-  return buildSnapshotFromEvents(Array.from(deduped.values()), snapshot.child);
+  const localQuickItems = quickItemsFromRecords(localEvents);
+  const quickItems = new Map(
+    snapshot.quickItems.map((item) => [item.key, item]),
+  );
+  localQuickItems.forEach((item) => quickItems.set(item.key, item));
+
+  return buildSnapshotFromEvents(
+    Array.from(deduped.values()),
+    snapshot.child,
+    Array.from(quickItems.values()),
+  );
 }
 
-export function upsertSnapshotEvent(snapshot: DashboardSnapshot, event: CareEventRecord): DashboardSnapshot {
-  const events = snapshot.events.filter((item) => item.id !== event.id && item.idempotencyKey !== event.idempotencyKey);
-  return buildSnapshotFromEvents([event, ...events], snapshot.child);
+export function upsertSnapshotEvent(
+  snapshot: DashboardSnapshot,
+  event: CareEventRecord,
+): DashboardSnapshot {
+  const events = snapshot.events.filter(
+    (item) =>
+      item.id !== event.id && item.idempotencyKey !== event.idempotencyKey,
+  );
+  const quickItems = new Map(
+    snapshot.quickItems.map((item) => [item.key, item]),
+  );
+  quickItemsFromRecords([event]).forEach((item) =>
+    quickItems.set(item.key, item),
+  );
+
+  return buildSnapshotFromEvents(
+    [event, ...events],
+    snapshot.child,
+    Array.from(quickItems.values()),
+  );
 }

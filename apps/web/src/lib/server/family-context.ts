@@ -11,21 +11,28 @@ export interface DefaultFamilyContext {
     mom: {
       userId: string;
       username: string;
+      legacyUserIds: string[];
     };
     dad: {
       userId: string;
       username: string;
+      legacyUserIds: string[];
     };
   };
 }
 
-const DEFAULT_TIME_ZONE = process.env.NEXT_PUBLIC_DEFAULT_TIMEZONE ?? "Europe/Moscow";
-const DEFAULT_FAMILY_NAME = cleanDisplayName(process.env.DEFAULT_FAMILY_NAME, "Семья Амира");
+const DEFAULT_TIME_ZONE =
+  process.env.NEXT_PUBLIC_DEFAULT_TIMEZONE ?? "Europe/Moscow";
+const DEFAULT_FAMILY_NAME = cleanDisplayName(
+  process.env.DEFAULT_FAMILY_NAME,
+  "Семья Амира",
+);
 const DEFAULT_CHILD_NAME = cleanDisplayName(
   process.env.DEFAULT_CHILD_NAME ?? process.env.BOT_DEFAULT_CHILD_NAME,
   "Амир",
 );
-const DEFAULT_CHILD_BIRTH_DATE = process.env.DEFAULT_CHILD_BIRTH_DATE ?? "2026-04-20";
+const DEFAULT_CHILD_BIRTH_DATE =
+  process.env.DEFAULT_CHILD_BIRTH_DATE ?? "2026-04-20";
 
 function cleanDisplayName(value: string | undefined, fallback: string) {
   const normalized = value?.trim();
@@ -56,16 +63,44 @@ function parseBirthDate(value: string) {
     return new Date(Date.UTC(2026, 3, 20, 0, 0, 0, 0));
   }
 
-  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 0, 0, 0, 0));
+  return new Date(
+    Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  );
 }
 
 function buildTelegramPlaceholder(username: string, actor: "mom" | "dad") {
   return `app:${actor}:${username}`;
 }
 
+function defaultTelegramUserId(actor: "mom" | "dad") {
+  if (actor === "mom") {
+    return (process.env.DEFAULT_MOM_TELEGRAM_ID ?? "775978948").trim();
+  }
+
+  return (process.env.DEFAULT_DAD_TELEGRAM_ID ?? "5328212518").trim();
+}
+
 export async function ensureDefaultFamilyContext(): Promise<DefaultFamilyContext> {
-  const momUsername = normalizeUsername(process.env.DEFAULT_MOM_USERNAME, "manizha_u");
-  const dadUsername = normalizeUsername(process.env.DEFAULT_DAD_USERNAME, "yamob");
+  const momUsername = normalizeUsername(
+    process.env.DEFAULT_MOM_USERNAME,
+    "manizha_u",
+  );
+  const dadUsername = normalizeUsername(
+    process.env.DEFAULT_DAD_USERNAME,
+    "yamob",
+  );
+  const momTelegramUserId = defaultTelegramUserId("mom");
+  const dadTelegramUserId = defaultTelegramUserId("dad");
+  const legacyMomTelegramUserId = buildTelegramPlaceholder(momUsername, "mom");
+  const legacyDadTelegramUserId = buildTelegramPlaceholder(dadUsername, "dad");
   const childBirthDate = parseBirthDate(DEFAULT_CHILD_BIRTH_DATE);
 
   return prisma.$transaction(async (tx) => {
@@ -81,7 +116,10 @@ export async function ensureDefaultFamilyContext(): Promise<DefaultFamilyContext
         },
       }));
 
-    if (family.name !== DEFAULT_FAMILY_NAME || family.timeZone !== DEFAULT_TIME_ZONE) {
+    if (
+      family.name !== DEFAULT_FAMILY_NAME ||
+      family.timeZone !== DEFAULT_TIME_ZONE
+    ) {
       family = await tx.family.update({
         where: { id: family.id },
         data: {
@@ -92,44 +130,68 @@ export async function ensureDefaultFamilyContext(): Promise<DefaultFamilyContext
       });
     }
 
-    const mom = await tx.user.upsert({
-      where: {
-        telegramUserId: buildTelegramPlaceholder(momUsername, "mom"),
-      },
-      update: {
-        firstName: "Мама",
-        displayName: "Мама",
-        locale: "ru-RU",
-        timeZone: DEFAULT_TIME_ZONE,
-        deletedAt: null,
-      },
-      create: {
-        telegramUserId: buildTelegramPlaceholder(momUsername, "mom"),
-        firstName: "Мама",
-        displayName: "Мама",
-        locale: "ru-RU",
-        timeZone: DEFAULT_TIME_ZONE,
-      },
+    const existingMom =
+      (await tx.user.findUnique({
+        where: { telegramUserId: momTelegramUserId },
+      })) ??
+      (await tx.user.findUnique({
+        where: { telegramUserId: legacyMomTelegramUserId },
+      }));
+    const mom = existingMom
+      ? await tx.user.update({
+          where: { id: existingMom.id },
+          data: {
+            telegramUserId: momTelegramUserId,
+            firstName: "Мама",
+            displayName: "Мама",
+            locale: "ru-RU",
+            timeZone: DEFAULT_TIME_ZONE,
+            deletedAt: null,
+          },
+        })
+      : await tx.user.create({
+          data: {
+            telegramUserId: momTelegramUserId,
+            firstName: "Мама",
+            displayName: "Мама",
+            locale: "ru-RU",
+            timeZone: DEFAULT_TIME_ZONE,
+          },
+        });
+    const legacyMom = await tx.user.findUnique({
+      where: { telegramUserId: legacyMomTelegramUserId },
     });
 
-    const dad = await tx.user.upsert({
-      where: {
-        telegramUserId: buildTelegramPlaceholder(dadUsername, "dad"),
-      },
-      update: {
-        firstName: "Папа",
-        displayName: "Папа",
-        locale: "ru-RU",
-        timeZone: DEFAULT_TIME_ZONE,
-        deletedAt: null,
-      },
-      create: {
-        telegramUserId: buildTelegramPlaceholder(dadUsername, "dad"),
-        firstName: "Папа",
-        displayName: "Папа",
-        locale: "ru-RU",
-        timeZone: DEFAULT_TIME_ZONE,
-      },
+    const existingDad =
+      (await tx.user.findUnique({
+        where: { telegramUserId: dadTelegramUserId },
+      })) ??
+      (await tx.user.findUnique({
+        where: { telegramUserId: legacyDadTelegramUserId },
+      }));
+    const dad = existingDad
+      ? await tx.user.update({
+          where: { id: existingDad.id },
+          data: {
+            telegramUserId: dadTelegramUserId,
+            firstName: "Папа",
+            displayName: "Папа",
+            locale: "ru-RU",
+            timeZone: DEFAULT_TIME_ZONE,
+            deletedAt: null,
+          },
+        })
+      : await tx.user.create({
+          data: {
+            telegramUserId: dadTelegramUserId,
+            firstName: "Папа",
+            displayName: "Папа",
+            locale: "ru-RU",
+            timeZone: DEFAULT_TIME_ZONE,
+          },
+        });
+    const legacyDad = await tx.user.findUnique({
+      where: { telegramUserId: legacyDadTelegramUserId },
     });
 
     await tx.familyMember.upsert({
@@ -207,10 +269,14 @@ export async function ensureDefaultFamilyContext(): Promise<DefaultFamilyContext
         mom: {
           userId: mom.id,
           username: momUsername,
+          legacyUserIds:
+            legacyMom && legacyMom.id !== mom.id ? [legacyMom.id] : [],
         },
         dad: {
           userId: dad.id,
           username: dadUsername,
+          legacyUserIds:
+            legacyDad && legacyDad.id !== dad.id ? [legacyDad.id] : [],
         },
       },
     };

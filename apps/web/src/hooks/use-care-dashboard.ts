@@ -15,15 +15,31 @@ import {
   setStoredActor,
   upsertLocalEvent,
 } from "@/lib/offline-queue";
-import { createEventRecord, mergeSnapshot, upsertSnapshotEvent } from "@/lib/mock-data";
-import { buildTelegramHeaders, resolveTelegramActor } from "@/lib/telegram-identity";
-import type { ActorId, CareEventRecord, DashboardSnapshot, EventDraft } from "@/lib/types";
+import {
+  createEventRecord,
+  mergeSnapshot,
+  upsertSnapshotEvent,
+} from "@/lib/mock-data";
+import {
+  buildTelegramHeaders,
+  resolveTelegramActor,
+} from "@/lib/telegram-identity";
+import type {
+  ActorId,
+  CareEventRecord,
+  DashboardSnapshot,
+  EventDraft,
+  QuickItemKind,
+} from "@/lib/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    REQUEST_TIMEOUT_MS,
+  );
 
   const response = await fetch(url, {
     ...options,
@@ -51,17 +67,31 @@ export function useCareDashboard() {
   const [online, setOnline] = useState(true);
   const [actorLocked, setActorLocked] = useState(false);
   const [actorDisplayName, setActorDisplayName] = useState("Мама");
+  const [accessDenied, setAccessDenied] = useState(false);
   const [aiAnswer, setAiAnswer] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   const refreshSnapshot = useEffectEvent(async () => {
+    if (accessDenied) {
+      return;
+    }
+
     setLoading(true);
     try {
-      const baseSnapshot = await fetchJson<DashboardSnapshot>(`/api/dashboard?ts=${Date.now()}`);
+      const baseSnapshot = await fetchJson<DashboardSnapshot>(
+        `/api/dashboard?ts=${Date.now()}`,
+        {
+          headers: buildTelegramHeaders(activeActor),
+        },
+      );
       const localEvents = getLocalEvents();
       const overrides = getEventOverrides();
       const pendingEvents = getPendingEvents();
-      const mergedSnapshot = mergeSnapshot(baseSnapshot, localEvents, overrides);
+      const mergedSnapshot = mergeSnapshot(
+        baseSnapshot,
+        localEvents,
+        overrides,
+      );
 
       startTransition(() => {
         setSnapshot(mergedSnapshot);
@@ -80,8 +110,14 @@ export function useCareDashboard() {
   });
 
   const refreshAi = useEffectEvent(async () => {
+    if (accessDenied) {
+      return;
+    }
+
     try {
-      const response = await fetchJson<{ answer: string }>("/api/ai");
+      const response = await fetchJson<{ answer: string }>("/api/ai", {
+        headers: buildTelegramHeaders(activeActor),
+      });
       setAiAnswer(response.answer);
     } catch {
       setAiAnswer("Подсказка временно недоступна.");
@@ -102,7 +138,10 @@ export function useCareDashboard() {
     setSyncing(true);
     try {
       for (const event of pendingEvents) {
-        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
+        const response = await fetchJson<{
+          ok: boolean;
+          event: CareEventRecord;
+        }>("/api/events", {
           method: "POST",
           headers: buildTelegramHeaders(event.actor),
           body: JSON.stringify({
@@ -118,7 +157,9 @@ export function useCareDashboard() {
         removeLocalEvent(event.id);
         removeEventOverride(event.id);
         startTransition(() => {
-          setSnapshot((current) => (current ? upsertSnapshotEvent(current, response.event) : current));
+          setSnapshot((current) =>
+            current ? upsertSnapshotEvent(current, response.event) : current,
+          );
         });
       }
       setPendingCount(getPendingEvents().length);
@@ -131,6 +172,15 @@ export function useCareDashboard() {
     const telegramActor = resolveTelegramActor();
 
     if (telegramActor) {
+      if (!telegramActor.allowed) {
+        setAccessDenied(true);
+        setActorLocked(true);
+        setActorDisplayName("Нет доступа");
+        setError(telegramActor.deniedReason ?? "Доступ закрыт.");
+        setLoading(false);
+        return;
+      }
+
       setActiveActor(telegramActor.actor);
       setActorLocked(telegramActor.locked);
       setActorDisplayName(telegramActor.displayName);
@@ -178,13 +228,20 @@ export function useCareDashboard() {
     const localEvents = upsertLocalEvent(event);
 
     startTransition(() => {
-      setSnapshot((current) => (current ? mergeSnapshot(current, localEvents, getEventOverrides()) : current));
+      setSnapshot((current) =>
+        current
+          ? mergeSnapshot(current, localEvents, getEventOverrides())
+          : current,
+      );
       setError("");
     });
 
     if (typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
+        const response = await fetchJson<{
+          ok: boolean;
+          event: CareEventRecord;
+        }>("/api/events", {
           method: "POST",
           headers: buildTelegramHeaders(draft.actor),
           body: JSON.stringify(draft),
@@ -192,7 +249,12 @@ export function useCareDashboard() {
         const nextLocalEvents = removeLocalEvent(event.id);
         startTransition(() => {
           setSnapshot((current) =>
-            current ? upsertSnapshotEvent(mergeSnapshot(current, nextLocalEvents, getEventOverrides()), response.event) : current,
+            current
+              ? upsertSnapshotEvent(
+                  mergeSnapshot(current, nextLocalEvents, getEventOverrides()),
+                  response.event,
+                )
+              : current,
           );
         });
       } catch {
@@ -217,13 +279,20 @@ export function useCareDashboard() {
     const localEvents = upsertLocalEvent(editedEvent);
     saveEventOverride(editedEvent);
     startTransition(() => {
-      setSnapshot((current) => (current ? mergeSnapshot(current, localEvents, getEventOverrides()) : current));
+      setSnapshot((current) =>
+        current
+          ? mergeSnapshot(current, localEvents, getEventOverrides())
+          : current,
+      );
       setError("");
     });
 
     if (typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        const response = await fetchJson<{ ok: boolean; event: CareEventRecord }>("/api/events", {
+        const response = await fetchJson<{
+          ok: boolean;
+          event: CareEventRecord;
+        }>("/api/events", {
           method: "PUT",
           headers: buildTelegramHeaders(activeActor),
           body: JSON.stringify({
@@ -242,7 +311,12 @@ export function useCareDashboard() {
         const nextOverrides = removeEventOverride(editedEvent.id);
         startTransition(() => {
           setSnapshot((current) =>
-            current ? upsertSnapshotEvent(mergeSnapshot(current, nextLocalEvents, nextOverrides), response.event) : current,
+            current
+              ? upsertSnapshotEvent(
+                  mergeSnapshot(current, nextLocalEvents, nextOverrides),
+                  response.event,
+                )
+              : current,
           );
         });
       } catch {
@@ -256,7 +330,9 @@ export function useCareDashboard() {
   });
 
   const replaceSnapshotEvent = (event: CareEventRecord) => {
-    setSnapshot((current) => (current ? upsertSnapshotEvent(current, event) : current));
+    setSnapshot((current) =>
+      current ? upsertSnapshotEvent(current, event) : current,
+    );
   };
 
   const downloadExport = useEffectEvent(
@@ -268,18 +344,47 @@ export function useCareDashboard() {
         actor?: string;
       },
     ) => {
-    const params = new URLSearchParams({ format });
-    if (filters?.period) params.set("period", filters.period);
-    if (filters?.kind) params.set("kind", filters.kind);
-    if (filters?.actor) params.set("actor", filters.actor);
-    const response = await fetch(`/api/exports?${params.toString()}`);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = format === "pdf" ? "care-summary.pdf" : "care-summary.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+      const params = new URLSearchParams({ format });
+      if (filters?.period) params.set("period", filters.period);
+      if (filters?.kind) params.set("kind", filters.kind);
+      if (filters?.actor) params.set("actor", filters.actor);
+      const response = await fetch(`/api/exports?${params.toString()}`, {
+        headers: buildTelegramHeaders(activeActor),
+      });
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download =
+        format === "pdf" ? "care-summary.pdf" : "care-summary.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+    },
+  );
+
+  const deleteQuickItem = useEffectEvent(
+    async (kind: QuickItemKind, label: string, key: string) => {
+      await fetchJson<{ ok: boolean; key: string }>("/api/quick-items", {
+        method: "DELETE",
+        headers: buildTelegramHeaders(activeActor),
+        body: JSON.stringify({ kind, label }),
+      });
+
+      startTransition(() => {
+        setSnapshot((current) =>
+          current
+            ? {
+                ...current,
+                quickItems: current.quickItems.filter(
+                  (item) => item.key !== key,
+                ),
+              }
+            : current,
+        );
+      });
     },
   );
 
@@ -292,6 +397,7 @@ export function useCareDashboard() {
     syncing,
     pendingCount,
     online,
+    accessDenied,
     aiAnswer,
     error,
     changeActor,
@@ -301,5 +407,6 @@ export function useCareDashboard() {
     refreshSnapshot,
     refreshAi,
     downloadExport,
+    deleteQuickItem,
   };
 }

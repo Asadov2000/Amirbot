@@ -15,6 +15,8 @@ export type CareEventKind =
   | "GROWTH"
   | "NOTE";
 
+export type QuickItemKind = Extract<CareEventKind, "SOLID_FOOD" | "MEDICATION">;
+
 export type EventStatus = "LOGGED" | "STARTED" | "COMPLETED";
 
 export interface ChildProfile {
@@ -90,6 +92,14 @@ export interface AiInsight {
   tone: "default" | "warn" | "danger";
 }
 
+export interface QuickItemRecord {
+  kind: QuickItemKind;
+  key: string;
+  label: string;
+  detail?: string;
+  updatedAt: string;
+}
+
 export interface DashboardSnapshot {
   generatedAt: string;
   child: ChildProfile;
@@ -98,6 +108,7 @@ export interface DashboardSnapshot {
   timers: TimerState;
   summary: DailySummary;
   periodSummaries: PeriodSummary[];
+  quickItems: QuickItemRecord[];
   events: CareEventRecord[];
   insights: AiInsight[];
 }

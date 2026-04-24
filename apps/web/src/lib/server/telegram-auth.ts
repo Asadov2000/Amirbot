@@ -14,11 +14,14 @@ export interface RequestActor {
   username?: string;
 }
 
-const isProduction = process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
-const MOM_USERNAME = normalizeUsername(process.env.DEFAULT_MOM_USERNAME ?? "manizha_u");
-const DAD_USERNAME = normalizeUsername(process.env.DEFAULT_DAD_USERNAME ?? "yamob");
-const MOM_TELEGRAM_ID = process.env.DEFAULT_MOM_TELEGRAM_ID;
-const DAD_TELEGRAM_ID = process.env.DEFAULT_DAD_TELEGRAM_ID;
+const isProduction =
+  process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
+const MOM_TELEGRAM_ID = (
+  process.env.DEFAULT_MOM_TELEGRAM_ID ?? "775978948"
+).trim();
+const DAD_TELEGRAM_ID = (
+  process.env.DEFAULT_DAD_TELEGRAM_ID ?? "5328212518"
+).trim();
 
 function normalizeUsername(value?: string): string {
   return value?.trim().replace(/^@+/, "").toLowerCase() ?? "";
@@ -27,28 +30,21 @@ function normalizeUsername(value?: string): string {
 function actorFromUser(user: TelegramInitDataUser): ActorId | null {
   const telegramUserId = user.id ? String(user.id) : undefined;
 
-  if (telegramUserId && DAD_TELEGRAM_ID && telegramUserId === DAD_TELEGRAM_ID) {
+  if (telegramUserId && telegramUserId === DAD_TELEGRAM_ID) {
     return "dad";
   }
 
-  if (telegramUserId && MOM_TELEGRAM_ID && telegramUserId === MOM_TELEGRAM_ID) {
-    return "mom";
-  }
-
-  const username = normalizeUsername(user.username);
-
-  if (username === DAD_USERNAME) {
-    return "dad";
-  }
-
-  if (username === MOM_USERNAME) {
+  if (telegramUserId && telegramUserId === MOM_TELEGRAM_ID) {
     return "mom";
   }
 
   return null;
 }
 
-function verifyTelegramInitData(initData: string, botToken: string): URLSearchParams {
+function verifyTelegramInitData(
+  initData: string,
+  botToken: string,
+): URLSearchParams {
   const params = new URLSearchParams(initData);
   const hash = params.get("hash");
 
@@ -63,7 +59,9 @@ function verifyTelegramInitData(initData: string, botToken: string): URLSearchPa
     .join("\n");
 
   const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
-  const expectedHash = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  const expectedHash = createHmac("sha256", secret)
+    .update(dataCheckString)
+    .digest("hex");
   const expected = Buffer.from(expectedHash, "hex");
   const actual = Buffer.from(hash, "hex");
 
