@@ -20,9 +20,22 @@ export interface DefaultFamilyContext {
 }
 
 const DEFAULT_TIME_ZONE = process.env.NEXT_PUBLIC_DEFAULT_TIMEZONE ?? "Europe/Moscow";
-const DEFAULT_FAMILY_NAME = process.env.DEFAULT_FAMILY_NAME ?? "Семья Амира";
-const DEFAULT_CHILD_NAME = process.env.DEFAULT_CHILD_NAME ?? process.env.BOT_DEFAULT_CHILD_NAME ?? "Амир";
+const DEFAULT_FAMILY_NAME = cleanDisplayName(process.env.DEFAULT_FAMILY_NAME, "Семья Амира");
+const DEFAULT_CHILD_NAME = cleanDisplayName(
+  process.env.DEFAULT_CHILD_NAME ?? process.env.BOT_DEFAULT_CHILD_NAME,
+  "Амир",
+);
 const DEFAULT_CHILD_BIRTH_DATE = process.env.DEFAULT_CHILD_BIRTH_DATE ?? "2026-04-20";
+
+function cleanDisplayName(value: string | undefined, fallback: string) {
+  const normalized = value?.trim();
+
+  if (!normalized || /^[?\s]+$/.test(normalized)) {
+    return fallback;
+  }
+
+  return normalized;
+}
 
 function normalizeUsername(value: string | undefined, fallback: string) {
   const normalized = value?.trim().replace(/^@+/, "");
