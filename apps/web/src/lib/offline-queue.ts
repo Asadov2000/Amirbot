@@ -10,14 +10,15 @@ function readJson<T>(key: string, fallback: T): T {
     return fallback;
   }
 
-  const raw = window.localStorage.getItem(key);
-  if (!raw) {
-    return fallback;
-  }
-
   try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return fallback;
+    }
+
     return JSON.parse(raw) as T;
   } catch {
+    window.localStorage.removeItem(key);
     return fallback;
   }
 }
@@ -27,11 +28,55 @@ function writeJson<T>(key: string, value: T): void {
     return;
   }
 
-  window.localStorage.setItem(key, JSON.stringify(value));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Telegram Desktop can keep broken storage entries between Mini App deploys.
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isCareEventRecord(value: unknown): value is CareEventRecord {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const kind = value.kind;
+  const actor = value.actor;
+  const status = value.status;
+  const source = value.source;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.idempotencyKey === "string" &&
+    typeof value.occurredAt === "string" &&
+    !Number.isNaN(new Date(value.occurredAt).getTime()) &&
+    typeof value.summary === "string" &&
+    isRecord(value.payload) &&
+    (actor === "mom" || actor === "dad") &&
+    ["FEEDING", "SLEEP", "DIAPER", "TEMPERATURE", "MEDICATION", "NOTE"].includes(String(kind)) &&
+    ["LOGGED", "STARTED", "COMPLETED"].includes(String(status)) &&
+    (source === "server" || source === "local")
+  );
+}
+
+function readEvents(key: string): CareEventRecord[] {
+  const rawEvents = readJson<unknown[]>(key, []);
+  const safeEvents = rawEvents.filter(isCareEventRecord);
+
+  if (safeEvents.length !== rawEvents.length) {
+    writeJson(key, safeEvents);
+  }
+
+  return safeEvents;
 }
 
 export function getStoredActor(): ActorId {
-  return readJson<ActorId>(ACTOR_KEY, "mom");
+  const actor = readJson<ActorId>(ACTOR_KEY, "mom");
+  return actor === "dad" || actor === "mom" ? actor : "mom";
 }
 
 export function setStoredActor(actor: ActorId): void {
@@ -39,7 +84,7 @@ export function setStoredActor(actor: ActorId): void {
 }
 
 export function getLocalEvents(): CareEventRecord[] {
-  return readJson<CareEventRecord[]>(LOCAL_EVENTS_KEY, []);
+  return readEvents(LOCAL_EVENTS_KEY);
 }
 
 export function saveLocalEvents(events: CareEventRecord[]): void {
@@ -65,7 +110,7 @@ export function replaceLocalEvent(localEventId: string, serverEvent: CareEventRe
 }
 
 export function getPendingEvents(): CareEventRecord[] {
-  return readJson<CareEventRecord[]>(PENDING_EVENTS_KEY, []);
+  return readEvents(PENDING_EVENTS_KEY);
 }
 
 export function enqueuePendingEvent(event: CareEventRecord): CareEventRecord[] {
@@ -81,7 +126,8 @@ export function removePendingEvent(eventId: string): CareEventRecord[] {
 }
 
 export function getEventOverrides(): Record<string, Partial<CareEventRecord>> {
-  return readJson<Record<string, Partial<CareEventRecord>>>(OVERRIDES_KEY, {});
+  const overrides = readJson<Record<string, Partial<CareEventRecord>>>(OVERRIDES_KEY, {});
+  return isRecord(overrides) ? overrides : {};
 }
 
 export function saveEventOverride(event: CareEventRecord): Record<string, Partial<CareEventRecord>> {

@@ -57,10 +57,15 @@ export function useCareDashboard() {
   const refreshSnapshot = useEffectEvent(async () => {
     setLoading(true);
     try {
-      const baseSnapshot = await fetchJson<DashboardSnapshot>("/api/dashboard");
+      const baseSnapshot = await fetchJson<DashboardSnapshot>(`/api/dashboard?ts=${Date.now()}`);
+      const localEvents = getLocalEvents();
+      const overrides = getEventOverrides();
+      const pendingEvents = getPendingEvents();
+      const mergedSnapshot = mergeSnapshot(baseSnapshot, localEvents, overrides);
+
       startTransition(() => {
-        setSnapshot(mergeSnapshot(baseSnapshot, getLocalEvents(), getEventOverrides()));
-        setPendingCount(getPendingEvents().length);
+        setSnapshot(mergedSnapshot);
+        setPendingCount(pendingEvents.length);
         setError("");
       });
     } catch (cause) {
