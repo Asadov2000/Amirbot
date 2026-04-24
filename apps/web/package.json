@@ -14,6 +14,7 @@
     "@amir/db": "workspace:*",
     "@amir/shared": "workspace:*",
     "@amir/ui": "workspace:*",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@telegram-apps/sdk": "^3.11.8",
     "@telegram-apps/sdk-react": "^3.3.9",
     "date-fns": "^4.1.0",

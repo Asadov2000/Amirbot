@@ -57,7 +57,7 @@ function isCareEventRecord(value: unknown): value is CareEventRecord {
     typeof value.summary === "string" &&
     isRecord(value.payload) &&
     (actor === "mom" || actor === "dad") &&
-    ["FEEDING", "SLEEP", "DIAPER", "TEMPERATURE", "MEDICATION", "NOTE"].includes(String(kind)) &&
+    ["FEEDING", "SOLID_FOOD", "SLEEP", "DIAPER", "TEMPERATURE", "MEDICATION", "GROWTH", "NOTE"].includes(String(kind)) &&
     ["LOGGED", "STARTED", "COMPLETED"].includes(String(status)) &&
     (source === "server" || source === "local")
   );

@@ -184,7 +184,7 @@ function toDashboardEventRecord(
       };
     }
     case "DIAPER": {
-      const diaperKind = event.diaperKind === "DIRTY" ? "DIRTY" : "WET";
+      const diaperKind = event.diaperKind === "DIRTY" ? "DIRTY" : event.diaperKind === "MIXED" ? "MIXED" : "WET";
 
       return {
         id: event.id,
@@ -192,7 +192,13 @@ function toDashboardEventRecord(
         kind: "DIAPER",
         actor,
         occurredAt: event.occurredAt.toISOString(),
-        summary: event.note?.trim() || (diaperKind === "DIRTY" ? "Подгузник — кака" : "Подгузник — моча"),
+        summary:
+          event.note?.trim() ||
+          (diaperKind === "DIRTY"
+            ? "Подгузник — покакал"
+            : diaperKind === "MIXED"
+              ? "Подгузник — пописал и покакал"
+              : "Подгузник — пописал"),
         payload: {
           type: diaperKind,
         },
@@ -242,7 +248,25 @@ function toDashboardEventRecord(
       };
     }
     case "NOTE":
-    default:
+    default: {
+      const dashboardKind =
+        payload.dashboardKind === "SOLID_FOOD" || payload.dashboardKind === "GROWTH" ? payload.dashboardKind : null;
+
+      if (dashboardKind) {
+        return {
+          id: event.id,
+          idempotencyKey: event.idempotencyKey,
+          kind: dashboardKind,
+          actor,
+          occurredAt: event.occurredAt.toISOString(),
+          summary: event.note?.trim() || String(payload.note ?? "Запись"),
+          payload,
+          status: "LOGGED",
+          editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+          source: "server",
+        };
+      }
+
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
@@ -251,12 +275,14 @@ function toDashboardEventRecord(
         occurredAt: event.occurredAt.toISOString(),
         summary: event.note?.trim() || "Заметка",
         payload: {
+          ...payload,
           note: event.note?.trim() || "Заметка",
         },
         status: "LOGGED",
         editedAt: event.revision > 1 ? event.updatedAt.toISOString() : undefined,
         source: "server",
       };
+    }
   }
 }
 
@@ -361,7 +387,12 @@ function toCreateInput(
       return {
         ...baseInput,
         type: "DIAPER" as const,
-        diaperKind: draft.payload.type === "DIRTY" ? ("DIRTY" as const) : ("WET" as const),
+        diaperKind:
+          draft.payload.type === "DIRTY"
+            ? ("DIRTY" as const)
+            : draft.payload.type === "MIXED"
+              ? ("MIXED" as const)
+              : ("WET" as const),
         note: draft.summary,
       };
     case "TEMPERATURE":
@@ -384,6 +415,26 @@ function toCreateInput(
         note: draft.summary,
       };
     }
+    case "SOLID_FOOD":
+      return {
+        ...baseInput,
+        type: "NOTE" as const,
+        note: draft.summary,
+        payload: {
+          ...draft.payload,
+          dashboardKind: "SOLID_FOOD",
+        },
+      };
+    case "GROWTH":
+      return {
+        ...baseInput,
+        type: "NOTE" as const,
+        note: draft.summary,
+        payload: {
+          ...draft.payload,
+          dashboardKind: "GROWTH",
+        },
+      };
     case "NOTE":
     default:
       return {

@@ -7,10 +7,12 @@ export const actorLabels: Record<ActorId, string> = {
 
 export type CareEventKind =
   | "FEEDING"
+  | "SOLID_FOOD"
   | "SLEEP"
   | "DIAPER"
   | "TEMPERATURE"
   | "MEDICATION"
+  | "GROWTH"
   | "NOTE";
 
 export type EventStatus = "LOGGED" | "STARTED" | "COMPLETED";
@@ -55,12 +57,23 @@ export interface ReminderCard {
 export interface DailySummary {
   dateLabel: string;
   feedingsCount: number;
+  solidFoodsCount?: number;
   totalSleepMinutes: number;
   averageFeedingIntervalMinutes: number;
   diaperWetCount: number;
   diaperDirtyCount: number;
+  diaperMixedCount?: number;
   temperatureReadingsCount: number;
   medicationsCount: number;
+  growthReadingsCount?: number;
+}
+
+export type SummaryPeriodId = "1d" | "3d" | "7d" | "30d" | "365d";
+
+export interface PeriodSummary extends DailySummary {
+  id: SummaryPeriodId;
+  title: string;
+  days: number;
 }
 
 export interface TimerState {
@@ -84,6 +97,7 @@ export interface DashboardSnapshot {
   reminders: ReminderCard[];
   timers: TimerState;
   summary: DailySummary;
+  periodSummaries: PeriodSummary[];
   events: CareEventRecord[];
   insights: AiInsight[];
 }

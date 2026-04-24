@@ -8,6 +8,7 @@ export async function GET() {
   return NextResponse.json({
     generatedAt: snapshot.generatedAt,
     summary: snapshot.summary,
+    periodSummaries: snapshot.periodSummaries,
     overview: snapshot.overview,
     reminders: snapshot.reminders,
   });

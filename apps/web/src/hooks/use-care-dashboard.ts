@@ -84,7 +84,7 @@ export function useCareDashboard() {
       const response = await fetchJson<{ answer: string }>("/api/ai");
       setAiAnswer(response.answer);
     } catch {
-      setAiAnswer("AI-подсказка временно недоступна.");
+      setAiAnswer("Подсказка временно недоступна.");
     }
   });
 

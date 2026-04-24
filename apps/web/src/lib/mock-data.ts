@@ -1,5 +1,14 @@
 import { actorLabel, calculateAgeLabel, formatDueLabel, formatDuration, formatRelativeFromNow } from "./format";
-import type { AiInsight, CareEventRecord, DashboardSnapshot, DailySummary, EventDraft, ReminderCard } from "./types";
+import type {
+  AiInsight,
+  CareEventRecord,
+  DashboardSnapshot,
+  DailySummary,
+  EventDraft,
+  PeriodSummary,
+  ReminderCard,
+  SummaryPeriodId,
+} from "./types";
 
 const CHILD_BIRTH_DATE = "2026-04-20T09:00:00+03:00";
 
@@ -13,27 +22,33 @@ function createId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
-function todayStart(): number {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-}
-
 function baseEvents(): CareEventRecord[] {
   return [];
 }
 
-function isToday(timestamp: string): boolean {
-  return new Date(timestamp).getTime() >= todayStart();
+const SUMMARY_PERIODS: Array<{ id: SummaryPeriodId; title: string; days: number }> = [
+  { id: "1d", title: "1 день", days: 1 },
+  { id: "3d", title: "3 дня", days: 3 },
+  { id: "7d", title: "Неделя", days: 7 },
+  { id: "30d", title: "Месяц", days: 30 },
+  { id: "365d", title: "Год", days: 365 },
+];
+
+function periodStart(days: number): number {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  start.setDate(start.getDate() - days + 1);
+  return start.getTime();
 }
 
-function getSummary(events: CareEventRecord[]): DailySummary {
-  const todayEvents = events.filter((event) => isToday(event.occurredAt));
-  const feedingEvents = todayEvents.filter((event) => event.kind === "FEEDING");
-  const diaperEvents = todayEvents.filter((event) => event.kind === "DIAPER");
-  const sleepStarts = todayEvents
+function getSummary(events: CareEventRecord[], days = 1): DailySummary {
+  const periodEvents = events.filter((event) => new Date(event.occurredAt).getTime() >= periodStart(days));
+  const feedingEvents = periodEvents.filter((event) => event.kind === "FEEDING");
+  const diaperEvents = periodEvents.filter((event) => event.kind === "DIAPER");
+  const sleepStarts = periodEvents
     .filter((event) => event.kind === "SLEEP" && event.payload.phase === "START")
     .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
-  const sleepEnds = todayEvents
+  const sleepEnds = periodEvents
     .filter((event) => event.kind === "SLEEP" && event.payload.phase === "END")
     .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
 
@@ -67,14 +82,24 @@ function getSummary(events: CareEventRecord[]): DailySummary {
       month: "long",
     }).format(new Date()),
     feedingsCount: feedingEvents.length,
+    solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD").length,
     totalSleepMinutes,
     averageFeedingIntervalMinutes:
       feedingEvents.length > 1 ? Math.round(intervalSum / (feedingEvents.length - 1)) : 0,
     diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET").length,
     diaperDirtyCount: diaperEvents.filter((event) => event.payload.type === "DIRTY").length,
-    temperatureReadingsCount: todayEvents.filter((event) => event.kind === "TEMPERATURE").length,
-    medicationsCount: todayEvents.filter((event) => event.kind === "MEDICATION").length,
+    diaperMixedCount: diaperEvents.filter((event) => event.payload.type === "MIXED").length,
+    temperatureReadingsCount: periodEvents.filter((event) => event.kind === "TEMPERATURE").length,
+    medicationsCount: periodEvents.filter((event) => event.kind === "MEDICATION").length,
+    growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH").length,
   };
+}
+
+function getPeriodSummaries(events: CareEventRecord[]): PeriodSummary[] {
+  return SUMMARY_PERIODS.map((period) => ({
+    ...getSummary(events, period.days),
+    ...period,
+  }));
 }
 
 function getReminders(events: CareEventRecord[]): ReminderCard[] {
@@ -228,6 +253,7 @@ export function buildSnapshotFromEvents(
         : undefined,
     },
     summary: getSummary(sortedEvents),
+    periodSummaries: getPeriodSummaries(sortedEvents),
     events: sortedEvents,
     insights: [],
   };

@@ -18,12 +18,12 @@ import {
 } from "@amir/ui";
 
 import { actorLabel, formatDateTime, formatDuration, formatTime } from "@/lib/format";
-import type { ActorId, CareEventKind, CareEventRecord, EventDraft, EventStatus } from "@/lib/types";
+import type { ActorId, CareEventKind, CareEventRecord, EventDraft, EventStatus, SummaryPeriodId } from "@/lib/types";
 import { useCareDashboard } from "@/hooks/use-care-dashboard";
 import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type TabId = "home" | "log" | "feed" | "summary" | "export";
-type ActionId = "feeding" | "sleep" | "diaper" | "temperature" | "medication" | "note";
+type ActionId = "feeding" | "diaper" | "solid_food" | "sleep" | "medication" | "temperature" | "note" | "growth";
 
 interface ActionPreset {
   id: string;
@@ -142,31 +142,44 @@ const actions: ActionDefinition[] = [
     kind: "DIAPER",
     icon: "🧷",
     title: "Подгузник",
-    subtitle: "Моча или кака",
+    subtitle: "Пописал, покакал или всё вместе",
     presets: [
       {
         id: "wet",
-        label: "Моча",
-        helper: "Быстрый отметчик",
+        label: "Пописал",
+        helper: "Быстрая отметка подгузника",
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "DIAPER",
           actor,
           occurredAt,
-          summary: "Подгузник — моча",
+          summary: "Подгузник — пописал",
           payload: { type: "WET" },
           status: "LOGGED",
         }),
       },
       {
         id: "dirty",
-        label: "Кака",
-        helper: "Отдельная отметка",
+        label: "Покакал",
+        helper: "Отдельная отметка стула",
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "DIAPER",
           actor,
           occurredAt,
-          summary: "Подгузник — кака",
+          summary: "Подгузник — покакал",
           payload: { type: "DIRTY" },
+          status: "LOGGED",
+        }),
+      },
+      {
+        id: "mixed",
+        label: "Пописал и покакал",
+        helper: "Одна отметка для смешанного подгузника",
+        buildDraft: ({ actor, occurredAt }) => ({
+          kind: "DIAPER",
+          actor,
+          occurredAt,
+          summary: "Подгузник — пописал и покакал",
+          payload: { type: "MIXED" },
           status: "LOGGED",
         }),
       },
@@ -201,41 +214,55 @@ const actions: ActionDefinition[] = [
     ],
   },
   {
+    id: "solid_food",
+    kind: "SOLID_FOOD",
+    icon: "🥣",
+    title: "Прикорм",
+    subtitle: "Список пустой — добавляйте продукты по мере введения",
+    presets: [
+      {
+        id: "solid_food",
+        label: "Добавить прикорм",
+        helper: "Например: кабачок 2 ложки, реакции нет",
+        defaultInput: "",
+        inputLabel: "Продукт и реакция",
+        inputPlaceholder: "Кабачок, 2 ложки, без реакции",
+        inputType: "text",
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const value = inputValue.trim();
+          return {
+            kind: "SOLID_FOOD",
+            actor,
+            occurredAt,
+            summary: value ? `Прикорм — ${value}` : "Прикорм",
+            payload: { food: value || "Прикорм" },
+            status: "LOGGED",
+          };
+        },
+      },
+    ],
+  },
+  {
     id: "medication",
     kind: "MEDICATION",
     icon: "💊",
     title: "Лекарство",
-    subtitle: "Два частых сценария",
+    subtitle: "Список пустой — добавляйте назначения вручную",
     presets: [
       {
-        id: "vitamin_d",
-        label: "Витамин D",
-        helper: "По умолчанию 1 капля",
-        defaultInput: "1 капля",
-        inputLabel: "Доза",
+        id: "custom_medication",
+        label: "Добавить лекарство",
+        helper: "Название, дозировка и комментарий",
+        defaultInput: "",
+        inputLabel: "Лекарство и доза",
+        inputPlaceholder: "Витамин D — 1 капля",
         inputType: "text",
         buildDraft: ({ actor, occurredAt, inputValue }) => ({
           kind: "MEDICATION",
           actor,
           occurredAt,
-          summary: `Витамин D — ${inputValue || "1 капля"}`,
-          payload: { medication: "Витамин D", dose: inputValue || "1 капля" },
-          status: "COMPLETED",
-        }),
-      },
-      {
-        id: "paracetamol",
-        label: "Парацетамол",
-        helper: "Например 2.5 мл",
-        defaultInput: "2.5 мл",
-        inputLabel: "Доза",
-        inputType: "text",
-        buildDraft: ({ actor, occurredAt, inputValue }) => ({
-          kind: "MEDICATION",
-          actor,
-          occurredAt,
-          summary: `Парацетамол — ${inputValue || "2.5 мл"}`,
-          payload: { medication: "Парацетамол", dose: inputValue || "2.5 мл" },
+          summary: inputValue.trim() ? `Лекарство — ${inputValue.trim()}` : "Лекарство",
+          payload: { medication: inputValue.trim() || "Лекарство", dose: inputValue.trim() || "без дозы" },
           status: "COMPLETED",
         }),
       },
@@ -267,7 +294,46 @@ const actions: ActionDefinition[] = [
       },
     ],
   },
+  {
+    id: "growth",
+    kind: "GROWTH",
+    icon: "📏",
+    title: "Вес и рост",
+    subtitle: "Контроль динамики развития",
+    presets: [
+      {
+        id: "growth",
+        label: "Добавить измерение",
+        helper: "Например: 4.2 кг, 54 см",
+        defaultInput: "",
+        inputLabel: "Вес и рост",
+        inputPlaceholder: "4.2 кг, 54 см",
+        inputType: "text",
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const value = inputValue.trim();
+          const numbers = value.match(/\d+(?:[.,]\d+)?/g) ?? [];
+          return {
+            kind: "GROWTH",
+            actor,
+            occurredAt,
+            summary: value ? `Вес и рост — ${value}` : "Вес и рост",
+            payload: {
+              note: value || "Измерение",
+              weightKg: numbers[0] ? Number(numbers[0].replace(",", ".")) : null,
+              heightCm: numbers[1] ? Number(numbers[1].replace(",", ".")) : null,
+            },
+            status: "LOGGED",
+          };
+        },
+      },
+    ],
+  },
 ];
+
+const actionOrder: ActionId[] = ["feeding", "diaper", "solid_food", "sleep", "medication", "temperature", "note", "growth"];
+const orderedActions = actionOrder
+  .map((id) => actions.find((action) => action.id === id))
+  .filter((action): action is ActionDefinition => Boolean(action));
 
 function actionById(id: ActionId | null): ActionDefinition | undefined {
   return actions.find((action) => action.id === id);
@@ -277,6 +343,8 @@ function resolveActionId(kind: CareEventKind): ActionId {
   switch (kind) {
     case "FEEDING":
       return "feeding";
+    case "SOLID_FOOD":
+      return "solid_food";
     case "SLEEP":
       return "sleep";
     case "DIAPER":
@@ -285,6 +353,8 @@ function resolveActionId(kind: CareEventKind): ActionId {
       return "temperature";
     case "MEDICATION":
       return "medication";
+    case "GROWTH":
+      return "growth";
     case "NOTE":
     default:
       return "note";
@@ -295,16 +365,18 @@ function resolvePresetId(event: CareEventRecord): string {
   switch (event.kind) {
     case "FEEDING":
       return event.payload.mode === "BOTTLE" ? "bottle" : "breast";
+    case "SOLID_FOOD":
+      return "solid_food";
     case "SLEEP":
       return event.payload.phase === "END" ? "sleep_end" : "sleep_start";
     case "DIAPER":
-      return event.payload.type === "DIRTY" ? "dirty" : "wet";
+      return event.payload.type === "DIRTY" ? "dirty" : event.payload.type === "MIXED" ? "mixed" : "wet";
     case "TEMPERATURE":
       return "temperature";
     case "MEDICATION":
-      return String(event.payload.medication).toLowerCase().includes("парацет")
-        ? "paracetamol"
-        : "vitamin_d";
+      return "custom_medication";
+    case "GROWTH":
+      return "growth";
     case "NOTE":
     default:
       return "note";
@@ -332,8 +404,16 @@ function extractInputValue(event: CareEventRecord): string {
     return String(event.payload.temperatureC ?? "");
   }
 
+  if (event.kind === "SOLID_FOOD") {
+    return String(event.payload.food ?? event.payload.note ?? "");
+  }
+
   if (event.kind === "MEDICATION") {
-    return String(event.payload.dose ?? "");
+    return String(event.payload.medication ?? event.payload.dose ?? "");
+  }
+
+  if (event.kind === "GROWTH") {
+    return String(event.payload.note ?? "");
   }
 
   if (event.kind === "NOTE") {
@@ -359,6 +439,8 @@ function accentFromEvent(kind: CareEventKind): string {
   switch (kind) {
     case "FEEDING":
       return "#67e8f9";
+    case "SOLID_FOOD":
+      return "#22c55e";
     case "SLEEP":
       return "#8b5cf6";
     case "DIAPER":
@@ -367,6 +449,8 @@ function accentFromEvent(kind: CareEventKind): string {
       return "#fb7185";
     case "MEDICATION":
       return "#f97316";
+    case "GROWTH":
+      return "#38bdf8";
     case "NOTE":
     default:
       return "#a3e635";
@@ -401,6 +485,7 @@ export function CareDashboard() {
   const [timeValue, setTimeValue] = useState(toTimeInput(new Date().toISOString()));
   const [sheetActor, setSheetActor] = useState<ActorId>("mom");
   const [editingEvent, setEditingEvent] = useState<CareEventRecord | null>(null);
+  const [summaryPeriodId, setSummaryPeriodId] = useState<SummaryPeriodId>("1d");
   const [submitting, setSubmitting] = useState(false);
 
   const currentAction = actionById(sheetActionId);
@@ -504,26 +589,56 @@ export function CareDashboard() {
     );
   }
 
+  const activeSummary =
+    snapshot.periodSummaries.find((summary) => summary.id === summaryPeriodId) ??
+    snapshot.periodSummaries[0] ??
+    ({
+      ...snapshot.summary,
+      id: "1d",
+      title: "1 день",
+      days: 1,
+    } as const);
+
   const summaryMetrics = [
     {
       label: "Кормлений",
-      value: String(snapshot.summary.feedingsCount),
-      helper: "за сегодня",
+      value: String(activeSummary.feedingsCount),
+      helper: activeSummary.title,
+    },
+    {
+      label: "Прикорм",
+      value: String(activeSummary.solidFoodsCount ?? 0),
+      helper: "продукты и реакции",
     },
     {
       label: "Общий сон",
-      value: formatDuration(snapshot.summary.totalSleepMinutes),
-      helper: "с начала суток",
+      value: formatDuration(activeSummary.totalSleepMinutes),
+      helper: "по отмеченным отрезкам",
     },
     {
       label: "Средний интервал",
-      value: formatDuration(snapshot.summary.averageFeedingIntervalMinutes),
+      value: formatDuration(activeSummary.averageFeedingIntervalMinutes),
       helper: "между кормлениями",
     },
     {
       label: "Подгузники",
-      value: `${snapshot.summary.diaperWetCount + snapshot.summary.diaperDirtyCount}`,
-      helper: `моча ${snapshot.summary.diaperWetCount} • кака ${snapshot.summary.diaperDirtyCount}`,
+      value: `${activeSummary.diaperWetCount + activeSummary.diaperDirtyCount + (activeSummary.diaperMixedCount ?? 0)}`,
+      helper: `моча ${activeSummary.diaperWetCount} • кака ${activeSummary.diaperDirtyCount} • вместе ${activeSummary.diaperMixedCount ?? 0}`,
+    },
+    {
+      label: "Температура",
+      value: String(activeSummary.temperatureReadingsCount),
+      helper: "замеры за период",
+    },
+    {
+      label: "Лекарства",
+      value: String(activeSummary.medicationsCount),
+      helper: "отмеченные приёмы",
+    },
+    {
+      label: "Вес и рост",
+      value: String(activeSummary.growthReadingsCount ?? 0),
+      helper: "контрольные измерения",
     },
   ];
 
@@ -533,10 +648,10 @@ export function CareDashboard() {
         <Card className="hero-card">
           <div className="hero-topline">
             <div>
-              <div className="eyebrow">Mini App для семьи</div>
+              <div className="eyebrow">Панель ухода</div>
               <h1 className="hero-title">{snapshot.child.name}</h1>
               <div className="hero-subtitle">
-                {snapshot.child.ageLabel} • Telegram Mini App • ночной режим по умолчанию
+                {snapshot.child.ageLabel} • семейный журнал здоровья, режима и назначений
               </div>
             </div>
             <div className="status-pills">
@@ -587,7 +702,7 @@ export function CareDashboard() {
         <SectionTitle eyebrow="Сейчас" title="Главные показатели" />
         <div className="stats-grid">
           <StatTile label="Возраст" value={snapshot.overview.age} helper="от 0 мес до 3 лет" accent="#67e8f9" />
-          <StatTile label="Последнее кормление" value={snapshot.overview.lastFeeding} helper="быстрый ответ для AI" accent="#8b5cf6" />
+          <StatTile label="Последнее кормление" value={snapshot.overview.lastFeeding} helper="по журналу ухода" accent="#8b5cf6" />
           <StatTile label="Сон" value={snapshot.overview.sleepStatus} helper="таймер сна активен" accent="#60a5fa" />
           <StatTile label="Подгузник" value={snapshot.overview.diaperGap} helper="время с последней смены" accent="#f59e0b" />
           <StatTile label="Температура" value={snapshot.overview.temperature} helper="статистика и тревога" accent="#fb7185" />
@@ -597,9 +712,9 @@ export function CareDashboard() {
 
       <section className="dashboard-section dashboard-two-columns">
         <Card>
-          <SectionTitle eyebrow="Быстрый лог" title="Одно нажатие ночью" />
+          <SectionTitle eyebrow="Основные действия" title="Одно нажатие ночью" />
           <div className="actions-grid">
-            {actions.map((action) => (
+            {orderedActions.map((action) => (
               <ActionButton
                 key={action.id}
                 icon={action.icon}
@@ -683,7 +798,7 @@ export function CareDashboard() {
       <Card>
         <SectionTitle eyebrow="Запись событий" title="Минимум ввода, максимум скорости" />
         <div className="actions-grid">
-          {actions.map((action) => (
+          {orderedActions.map((action) => (
             <ActionButton
               key={action.id}
               icon={action.icon}
@@ -728,7 +843,19 @@ export function CareDashboard() {
   const renderSummary = () => (
     <section className="dashboard-section dashboard-two-columns">
       <Card>
-        <SectionTitle eyebrow="День" title="Сводка дня" />
+        <SectionTitle eyebrow="Период" title="Сводка по уходу" />
+        <div className="period-tabs" aria-label="Период сводки">
+          {snapshot.periodSummaries.map((summary) => (
+            <button
+              key={summary.id}
+              type="button"
+              className={summaryPeriodId === summary.id ? "period-tab active" : "period-tab"}
+              onClick={() => setSummaryPeriodId(summary.id)}
+            >
+              {summary.title}
+            </button>
+          ))}
+        </div>
         <div className="metrics-grid">
           {summaryMetrics.map((metric) => (
             <Surface key={metric.label} style={{ minHeight: 120 }}>
@@ -739,7 +866,7 @@ export function CareDashboard() {
       </Card>
 
       <Card>
-        <SectionTitle eyebrow="AI" title="Подсказки по режиму" action={<GhostButton onClick={() => void refreshAi()}>Обновить</GhostButton>} />
+        <SectionTitle eyebrow="Наблюдения" title="Подсказки по режиму" action={<GhostButton onClick={() => void refreshAi()}>Обновить</GhostButton>} />
         <div className="stack-list">
           <Surface>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Короткий ответ</div>
@@ -767,7 +894,7 @@ export function CareDashboard() {
           <Surface>
             <div style={{ fontSize: 18, fontWeight: 700 }}>PDF</div>
             <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              Дневная или недельная выжимка с кормлениями, сном, температурой и лекарствами.
+              Аккуратная сводка по периодам, текущему статусу и событиям для врача.
             </div>
             <div style={{ marginTop: 16 }}>
               <PrimaryButton onClick={() => void downloadExport("pdf")}>Скачать PDF</PrimaryButton>
@@ -776,7 +903,7 @@ export function CareDashboard() {
           <Surface>
             <div style={{ fontSize: 18, fontWeight: 700 }}>CSV</div>
             <div style={{ marginTop: 8, color: "var(--muted-strong)", lineHeight: 1.6 }}>
-              Табличный экспорт всех событий для анализа и передачи врачу.
+              CSV с периодами, событиями, родителем, временем и деталями для анализа.
             </div>
             <div style={{ marginTop: 16 }}>
               <PrimaryButton onClick={() => void downloadExport("csv")}>Скачать CSV</PrimaryButton>
