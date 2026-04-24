@@ -19,15 +19,21 @@ import { createEventRecord, mergeSnapshot, upsertSnapshotEvent } from "@/lib/moc
 import { buildTelegramHeaders, resolveTelegramActor } from "@/lib/telegram-identity";
 import type { ActorId, CareEventRecord, DashboardSnapshot, EventDraft } from "@/lib/types";
 
+const REQUEST_TIMEOUT_MS = 12_000;
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   const response = await fetch(url, {
     ...options,
+    signal: options?.signal ?? controller.signal,
     headers: {
       "Content-Type": "application/json",
       ...(options?.headers ?? {}),
     },
     cache: "no-store",
-  });
+  }).finally(() => window.clearTimeout(timeoutId));
 
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
@@ -58,7 +64,11 @@ export function useCareDashboard() {
         setError("");
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось загрузить дашборд");
+      setError(
+        cause instanceof Error && cause.name === "AbortError"
+          ? "Telegram WebView не дождался ответа сервера. Проверьте сеть и нажмите повторить."
+          : "Не удалось загрузить данные семьи. Нажмите повторить или продолжайте оффлайн.",
+      );
     } finally {
       setLoading(false);
     }

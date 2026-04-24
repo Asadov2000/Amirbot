@@ -18,7 +18,11 @@ import {
 type TelegramBrowserWindow = Window &
   typeof globalThis & {
     Telegram?: {
-      WebApp?: unknown;
+      WebApp?: {
+        colorScheme?: "dark" | "light";
+        ready?: () => void;
+        expand?: () => void;
+      };
     };
   };
 
@@ -31,6 +35,16 @@ function hasTelegramWebApp() {
 }
 
 function mountTelegramComponents() {
+  const webApp = typeof window !== "undefined" ? (window as TelegramBrowserWindow).Telegram?.WebApp : undefined;
+
+  if (webApp?.colorScheme && !window.localStorage.getItem("amir.theme")) {
+    document.documentElement.dataset.theme = webApp.colorScheme;
+    document.documentElement.style.colorScheme = webApp.colorScheme;
+  }
+
+  webApp?.ready?.();
+  webApp?.expand?.();
+
   if (mountMiniAppSync.isAvailable()) {
     mountMiniAppSync();
   }
@@ -59,20 +73,36 @@ function mountTelegramComponents() {
 
 export function TelegramProvider() {
   useEffect(() => {
-    if (!hasTelegramWebApp()) {
-      return;
-    }
-
     let cleanup = () => {};
+    let retryId: number | undefined;
+    let attempts = 0;
+    let mounted = false;
 
-    try {
-      cleanup = init();
-      mountTelegramComponents();
-    } catch {
-      cleanup();
-    }
+    const start = () => {
+      attempts += 1;
+      if (mounted || !hasTelegramWebApp()) {
+        if (!mounted && attempts < 12) {
+          retryId = window.setTimeout(start, 250);
+        }
+        return;
+      }
+
+      try {
+        cleanup = init();
+        mountTelegramComponents();
+        mounted = true;
+      } catch (error) {
+        cleanup();
+        console.warn("Telegram Mini App init failed", error);
+      }
+    };
+
+    start();
 
     return () => {
+      if (retryId) {
+        window.clearTimeout(retryId);
+      }
       cleanup();
       try {
         miniApp.unmount();

@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Семейный трекер ребёнка для Telegram Mini App",
     start_url: "/",
     display: "standalone",
-    background_color: "#090d12",
+    background_color: "#f4f7fb",
     theme_color: "#090d12",
     lang: "ru-RU",
     icons: [

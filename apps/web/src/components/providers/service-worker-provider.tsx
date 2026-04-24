@@ -28,7 +28,11 @@ export function ServiceWorkerProvider() {
       return;
     }
 
-    void navigator.serviceWorker.register("/sw.js");
+    void navigator.serviceWorker
+      .register("/sw.js", {
+        updateViaCache: "none",
+      })
+      .then((registration) => registration.update());
   }, []);
 
   return null;

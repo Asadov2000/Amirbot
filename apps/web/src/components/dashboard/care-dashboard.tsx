@@ -20,6 +20,7 @@ import {
 import { actorLabel, formatDateTime, formatDuration, formatTime } from "@/lib/format";
 import type { ActorId, CareEventKind, CareEventRecord, EventDraft, EventStatus } from "@/lib/types";
 import { useCareDashboard } from "@/hooks/use-care-dashboard";
+import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type TabId = "home" | "log" | "feed" | "summary" | "export";
 type ActionId = "feeding" | "sleep" | "diaper" | "temperature" | "medication" | "note";
@@ -387,9 +388,11 @@ export function CareDashboard() {
     changeActor,
     addEvent,
     editEvent,
+    refreshSnapshot,
     refreshAi,
     downloadExport,
   } = useCareDashboard();
+  const { theme, setTheme } = useThemePreference();
 
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [sheetActionId, setSheetActionId] = useState<ActionId | null>(null);
@@ -472,11 +475,30 @@ export function CareDashboard() {
     }
   };
 
-  if (loading || !snapshot) {
+  if (loading) {
     return (
       <div className="page-shell">
-        <Card style={{ minHeight: 260, display: "grid", placeItems: "center" }}>
+        <Card className="app-loading-card">
+          <div className="loading-spinner" aria-hidden="true" />
           <div className="loading-copy">Собираю семейную ленту и свежие показатели…</div>
+          <div className="loading-hint">Если Telegram Desktop держит окно открытым, ответ сервера ограничен таймаутом.</div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!snapshot) {
+    return (
+      <div className="page-shell">
+        <Card className="app-loading-card">
+          <div className="empty-icon" aria-hidden="true">!</div>
+          <div className="loading-copy">Не удалось открыть данные семьи</div>
+          <div className="loading-hint">
+            {error || "Проверьте интернет в Telegram и повторите загрузку. Локальные записи не удаляются."}
+          </div>
+          <div className="retry-row">
+            <PrimaryButton onClick={() => void refreshSnapshot()}>Повторить</PrimaryButton>
+          </div>
         </Card>
       </div>
     );
@@ -521,6 +543,22 @@ export function CareDashboard() {
               <Pill tone={online ? "good" : "warn"}>{online ? "Онлайн" : "Оффлайн"}</Pill>
               {pendingCount > 0 ? <Pill tone="warn">В очереди: {pendingCount}</Pill> : null}
               {syncing ? <Pill tone="default">Синхронизация…</Pill> : null}
+              <div className="theme-switch" aria-label="Тема приложения">
+                <button
+                  type="button"
+                  className={theme === "dark" ? "theme-option active" : "theme-option"}
+                  onClick={() => setTheme("dark")}
+                >
+                  Тёмная
+                </button>
+                <button
+                  type="button"
+                  className={theme === "light" ? "theme-option active" : "theme-option"}
+                  onClick={() => setTheme("light")}
+                >
+                  Светлая
+                </button>
+              </div>
             </div>
           </div>
 

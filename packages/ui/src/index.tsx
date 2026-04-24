@@ -2,20 +2,20 @@ import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, PropsWithChil
 
 const styles = {
   card: {
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "1px solid var(--border)",
     borderRadius: 24,
-    background: "linear-gradient(180deg, rgba(22,27,36,0.96), rgba(13,17,24,0.98))",
-    boxShadow: "0 18px 40px rgba(0,0,0,0.28)",
+    background: "var(--card-bg)",
+    boxShadow: "var(--shadow)",
   } satisfies CSSProperties,
   surface: {
     borderRadius: 22,
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
   } satisfies CSSProperties,
   pill: {
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "var(--surface-strong)",
+    border: "1px solid var(--border)",
   } satisfies CSSProperties,
 };
 
@@ -104,7 +104,7 @@ export function StatTile({
         display: "grid",
         alignContent: "space-between",
         gap: 12,
-        background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 14%, rgba(255,255,255,0.02)), rgba(255,255,255,0.03))`,
+        background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 14%, var(--surface)), var(--surface))`,
       }}
     >
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
@@ -143,8 +143,8 @@ export function ActionButton({
           color: "inherit",
           cursor: "pointer",
           background: selected
-            ? "linear-gradient(180deg, rgba(94, 234, 212, 0.22), rgba(77, 124, 254, 0.16))"
-            : "rgba(255,255,255,0.04)",
+            ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), color-mix(in srgb, var(--accent-2) 16%, var(--surface)))"
+            : "var(--surface)",
           transform: selected ? "translateY(-1px)" : "none",
           transition: "transform 160ms ease, background 160ms ease, border-color 160ms ease",
         },
@@ -177,10 +177,10 @@ export function Pill({
   tone = "default",
 }: PropsWithChildren<{ tone?: "default" | "good" | "warn" | "danger" }>) {
   const palette: Record<string, CSSProperties> = {
-    default: { background: "rgba(255,255,255,0.06)", color: "var(--muted-strong)" },
-    good: { background: "rgba(74, 222, 128, 0.16)", color: "#b6f4c6" },
-    warn: { background: "rgba(250, 204, 21, 0.16)", color: "#f9df8d" },
-    danger: { background: "rgba(248, 113, 113, 0.18)", color: "#ffc3c3" },
+    default: { background: "var(--surface-strong)", color: "var(--muted-strong)" },
+    good: { background: "var(--good-soft)", color: "var(--good-text)" },
+    warn: { background: "var(--warn-soft)", color: "var(--warn-text)" },
+    danger: { background: "var(--danger-soft)", color: "var(--danger-text)" },
   };
 
   return (
@@ -298,12 +298,12 @@ export function PrimaryButton({
           borderRadius: 24,
           minHeight: 58,
           padding: "14px 18px",
-          color: "#031014",
-          background: "linear-gradient(135deg, #67e8f9, #8b5cf6 60%, #fb7185)",
+          color: "var(--primary-text)",
+          background: "linear-gradient(135deg, var(--accent), var(--accent-2) 60%, var(--accent-3))",
           fontSize: 16,
           fontWeight: 800,
           cursor: "pointer",
-          boxShadow: "0 18px 34px rgba(103, 232, 249, 0.18)",
+          boxShadow: "0 18px 34px color-mix(in srgb, var(--accent) 18%, transparent)",
         },
         style,
       )}
@@ -325,16 +325,20 @@ export function BottomTabs({
   return (
     <div
       style={{
-        position: "sticky",
+        position: "fixed",
+        left: "50%",
+        width: "min(calc(100% - 28px), 1080px)",
+        transform: "translateX(-50%)",
         bottom: "max(16px, env(safe-area-inset-bottom))",
         display: "grid",
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
         gap: 10,
         padding: 10,
         borderRadius: 28,
-        background: "rgba(12,16,22,0.78)",
+        background: "var(--nav-bg)",
         backdropFilter: "blur(18px)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        border: "1px solid var(--border)",
+        zIndex: 30,
       }}
     >
       {items.map((item) => {
@@ -348,8 +352,8 @@ export function BottomTabs({
               border: "none",
               minHeight: 58,
               borderRadius: 20,
-              background: active ? "rgba(103, 232, 249, 0.18)" : "transparent",
-              color: active ? "#ecfeff" : "var(--muted)",
+              background: active ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "transparent",
+              color: active ? "var(--text)" : "var(--muted)",
               fontWeight: active ? 700 : 600,
               display: "grid",
               placeItems: "center",

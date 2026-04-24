@@ -1,4 +1,4 @@
-const CACHE_NAME = "amir-care-v1";
+const CACHE_NAME = "amir-care-v4";
 const FALLBACK_URLS = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -7,6 +7,7 @@ self.addEventListener("install", (event) => {
       return cache.addAll(FALLBACK_URLS);
     }),
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -17,6 +18,7 @@ self.addEventListener("activate", (event) => {
       ),
     ),
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -43,19 +45,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
+  if (requestUrl.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
-      return fetch(event.request).then((response) => {
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
         if (response.ok && requestUrl.pathname.startsWith("/_next/")) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || Response.error())),
   );
 });
