@@ -24,6 +24,16 @@ import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type TabId = "home" | "log" | "feed" | "summary" | "export";
 type ActionId = "feeding" | "diaper" | "solid_food" | "sleep" | "medication" | "temperature" | "note" | "growth";
+type FeedKindFilter = CareEventKind | "ALL";
+type ActorFilter = ActorId | "ALL";
+
+interface ActionField {
+  id: string;
+  label: string;
+  defaultValue?: string;
+  inputPlaceholder?: string;
+  inputType?: "text" | "number";
+}
 
 interface ActionPreset {
   id: string;
@@ -33,8 +43,10 @@ interface ActionPreset {
   inputLabel?: string;
   inputPlaceholder?: string;
   inputType?: "text" | "number";
+  fields?: ActionField[];
+  hiddenForActors?: ActorId[];
   tone?: "default" | "warn" | "danger";
-  buildDraft: (context: { actor: ActorId; occurredAt: string; inputValue: string }) => EventDraft;
+  buildDraft: (context: { actor: ActorId; occurredAt: string; inputValue: string; fieldValues: Record<string, string> }) => EventDraft;
 }
 
 interface ActionDefinition {
@@ -54,6 +66,24 @@ const tabs = [
   { id: "export", label: "Экспорт", icon: "⇩" },
 ] satisfies Array<{ id: TabId; label: string; icon: string }>;
 
+const kindFilterOptions: Array<{ id: FeedKindFilter; label: string }> = [
+  { id: "ALL", label: "Все" },
+  { id: "FEEDING", label: "Кормление" },
+  { id: "DIAPER", label: "Подгузник" },
+  { id: "SOLID_FOOD", label: "Прикорм" },
+  { id: "SLEEP", label: "Сон" },
+  { id: "MEDICATION", label: "Лекарства" },
+  { id: "TEMPERATURE", label: "Температура" },
+  { id: "GROWTH", label: "Вес/рост" },
+  { id: "NOTE", label: "Заметки" },
+];
+
+const actorFilterOptions: Array<{ id: ActorFilter; label: string }> = [
+  { id: "ALL", label: "Оба" },
+  { id: "mom", label: "Мама" },
+  { id: "dad", label: "Папа" },
+];
+
 const actions: ActionDefinition[] = [
   {
     id: "feeding",
@@ -69,6 +99,7 @@ const actions: ActionDefinition[] = [
         defaultInput: "18",
         inputLabel: "Минуты",
         inputType: "number",
+        hiddenForActors: ["dad"],
         buildDraft: ({ actor, occurredAt, inputValue }) => {
           const durationMinutes = Number(inputValue || 18);
           return {
@@ -257,14 +288,20 @@ const actions: ActionDefinition[] = [
         inputLabel: "Лекарство и доза",
         inputPlaceholder: "Витамин D — 1 капля",
         inputType: "text",
-        buildDraft: ({ actor, occurredAt, inputValue }) => ({
-          kind: "MEDICATION",
-          actor,
-          occurredAt,
-          summary: inputValue.trim() ? `Лекарство — ${inputValue.trim()}` : "Лекарство",
-          payload: { medication: inputValue.trim() || "Лекарство", dose: inputValue.trim() || "без дозы" },
-          status: "COMPLETED",
-        }),
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const value = inputValue.trim();
+          const [namePart, ...doseParts] = value.split(/\s+[—-]\s+|,\s*/);
+          const medication = namePart?.trim() || value || "Лекарство";
+          const dose = doseParts.join(" ").trim() || "без дозы";
+          return {
+            kind: "MEDICATION",
+            actor,
+            occurredAt,
+            summary: value ? `Лекарство — ${value}` : "Лекарство",
+            payload: { medication, dose },
+            status: "COMPLETED",
+          };
+        },
       },
     ],
   },
@@ -305,13 +342,30 @@ const actions: ActionDefinition[] = [
         id: "growth",
         label: "Добавить измерение",
         helper: "Например: 4.2 кг, 54 см",
-        defaultInput: "",
-        inputLabel: "Вес и рост",
-        inputPlaceholder: "4.2 кг, 54 см",
-        inputType: "text",
-        buildDraft: ({ actor, occurredAt, inputValue }) => {
-          const value = inputValue.trim();
-          const numbers = value.match(/\d+(?:[.,]\d+)?/g) ?? [];
+        fields: [
+          {
+            id: "weightKg",
+            label: "Вес, кг",
+            inputPlaceholder: "4.2",
+            inputType: "number",
+          },
+          {
+            id: "heightCm",
+            label: "Рост, см",
+            inputPlaceholder: "54",
+            inputType: "number",
+          },
+        ],
+        buildDraft: ({ actor, occurredAt, fieldValues }) => {
+          const weightText = fieldValues.weightKg?.trim() ?? "";
+          const heightText = fieldValues.heightCm?.trim() ?? "";
+          const weightKg = weightText ? Number(weightText.replace(",", ".")) : null;
+          const heightCm = heightText ? Number(heightText.replace(",", ".")) : null;
+          const parts = [
+            typeof weightKg === "number" && Number.isFinite(weightKg) ? `${weightKg} кг` : "",
+            typeof heightCm === "number" && Number.isFinite(heightCm) ? `${heightCm} см` : "",
+          ].filter(Boolean);
+          const value = parts.join(", ");
           return {
             kind: "GROWTH",
             actor,
@@ -319,8 +373,8 @@ const actions: ActionDefinition[] = [
             summary: value ? `Вес и рост — ${value}` : "Вес и рост",
             payload: {
               note: value || "Измерение",
-              weightKg: numbers[0] ? Number(numbers[0].replace(",", ".")) : null,
-              heightCm: numbers[1] ? Number(numbers[1].replace(",", ".")) : null,
+              weightKg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
+              heightCm: typeof heightCm === "number" && Number.isFinite(heightCm) ? heightCm : null,
             },
             status: "LOGGED",
           };
@@ -337,6 +391,143 @@ const orderedActions = actionOrder
 
 function actionById(id: ActionId | null): ActionDefinition | undefined {
   return actions.find((action) => action.id === id);
+}
+
+function presetKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-zа-яё0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "item";
+}
+
+function getDefaultFieldValues(preset?: ActionPreset): Record<string, string> {
+  return Object.fromEntries((preset?.fields ?? []).map((field) => [field.id, field.defaultValue ?? ""]));
+}
+
+function getEventFieldValues(event: CareEventRecord): Record<string, string> {
+  if (event.kind !== "GROWTH") {
+    return {};
+  }
+
+  return {
+    weightKg: event.payload.weightKg ? String(event.payload.weightKg) : "",
+    heightCm: event.payload.heightCm ? String(event.payload.heightCm) : "",
+  };
+}
+
+function eventKindLabel(kind: CareEventKind): string {
+  switch (kind) {
+    case "FEEDING":
+      return "Кормление";
+    case "SOLID_FOOD":
+      return "Прикорм";
+    case "SLEEP":
+      return "Сон";
+    case "DIAPER":
+      return "Подгузник";
+    case "TEMPERATURE":
+      return "Температура";
+    case "MEDICATION":
+      return "Лекарство";
+    case "GROWTH":
+      return "Вес и рост";
+    case "NOTE":
+    default:
+      return "Заметка";
+  }
+}
+
+function eventIcon(kind: CareEventKind): string {
+  return actions.find((action) => action.kind === kind)?.icon ?? "•";
+}
+
+function dayKey(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function dayTitle(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(value));
+}
+
+function getHistoryPresets(action: ActionDefinition, events: CareEventRecord[]): ActionPreset[] {
+  if (action.id === "solid_food") {
+    const foods = Array.from(
+      new Set(
+        events
+          .filter((event) => event.kind === "SOLID_FOOD")
+          .map((event) => String(event.payload.food ?? event.payload.note ?? "").trim())
+          .filter((value) => value && value !== "Прикорм"),
+      ),
+    ).slice(0, 8);
+
+    return foods.map((food) => ({
+      id: `food_${presetKey(food)}`,
+      label: food,
+      helper: "Быстрая кнопка из семейного списка",
+      buildDraft: ({ actor, occurredAt }) => ({
+        kind: "SOLID_FOOD",
+        actor,
+        occurredAt,
+        summary: `Прикорм — ${food}`,
+        payload: { food },
+        status: "LOGGED",
+      }),
+    }));
+  }
+
+  if (action.id === "medication") {
+    const medications = new Map<string, { medication: string; dose: string }>();
+    events
+      .filter((event) => event.kind === "MEDICATION")
+      .forEach((event) => {
+        const medication = String(event.payload.medication ?? "").trim();
+        if (!medication || medication === "Лекарство" || medications.has(medication.toLowerCase())) {
+          return;
+        }
+        medications.set(medication.toLowerCase(), {
+          medication,
+          dose: String(event.payload.dose ?? "").trim(),
+        });
+      });
+
+    return Array.from(medications.values())
+      .slice(0, 8)
+      .map(({ medication, dose }) => ({
+        id: `med_${presetKey(medication)}`,
+        label: medication,
+        helper: dose ? `Быстро: ${dose}` : "Быстрая кнопка из семейного списка",
+        buildDraft: ({ actor, occurredAt }) => ({
+          kind: "MEDICATION",
+          actor,
+          occurredAt,
+          summary: dose ? `Лекарство — ${medication}, ${dose}` : `Лекарство — ${medication}`,
+          payload: { medication, dose: dose || "без дозы" },
+          status: "COMPLETED",
+        }),
+      }));
+  }
+
+  return [];
+}
+
+function getActionPresets(action: ActionDefinition, actor: ActorId, events: CareEventRecord[]): ActionPreset[] {
+  return [
+    ...getHistoryPresets(action, events),
+    ...action.presets.filter((preset) => !preset.hiddenForActors?.includes(actor)),
+  ];
+}
+
+function actionSubtitle(action: ActionDefinition, actor: ActorId): string {
+  if (action.id === "feeding" && actor === "dad") {
+    return "Бутылочка";
+  }
+
+  return action.subtitle;
 }
 
 function resolveActionId(kind: CareEventKind): ActionId {
@@ -409,7 +600,9 @@ function extractInputValue(event: CareEventRecord): string {
   }
 
   if (event.kind === "MEDICATION") {
-    return String(event.payload.medication ?? event.payload.dose ?? "");
+    const medication = String(event.payload.medication ?? "").trim();
+    const dose = String(event.payload.dose ?? "").trim();
+    return [medication, dose && dose !== "без дозы" ? dose : ""].filter(Boolean).join(" — ");
   }
 
   if (event.kind === "GROWTH") {
@@ -482,22 +675,30 @@ export function CareDashboard() {
   const [sheetActionId, setSheetActionId] = useState<ActionId | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   const [inputValue, setInputValue] = useState("");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [timeValue, setTimeValue] = useState(toTimeInput(new Date().toISOString()));
   const [sheetActor, setSheetActor] = useState<ActorId>("mom");
   const [editingEvent, setEditingEvent] = useState<CareEventRecord | null>(null);
   const [summaryPeriodId, setSummaryPeriodId] = useState<SummaryPeriodId>("1d");
+  const [feedKindFilter, setFeedKindFilter] = useState<FeedKindFilter>("ALL");
+  const [feedActorFilter, setFeedActorFilter] = useState<ActorFilter>("ALL");
+  const [exportPeriodId, setExportPeriodId] = useState<SummaryPeriodId>("30d");
+  const [exportKindFilter, setExportKindFilter] = useState<FeedKindFilter>("ALL");
+  const [exportActorFilter, setExportActorFilter] = useState<ActorFilter>("ALL");
   const [submitting, setSubmitting] = useState(false);
 
   const currentAction = actionById(sheetActionId);
-  const currentPreset = currentAction?.presets.find((preset) => preset.id === selectedPresetId) ?? currentAction?.presets[0];
+  const currentPresets = currentAction ? getActionPresets(currentAction, sheetActor, snapshot?.events ?? []) : [];
+  const currentPreset = currentPresets.find((preset) => preset.id === selectedPresetId) ?? currentPresets[0];
   const canChangeActor = !actorLocked;
 
   const openCreateSheet = (actionId: ActionId) => {
     const action = actionById(actionId);
-    const preset = action?.presets[0];
+    const preset = action ? getActionPresets(action, activeActor, snapshot?.events ?? [])[0] : undefined;
     setSheetActionId(actionId);
     setSelectedPresetId(preset?.id ?? "");
     setInputValue(preset?.defaultInput ?? "");
+    setFieldValues(getDefaultFieldValues(preset));
     setTimeValue(toTimeInput(new Date().toISOString()));
     setSheetActor(activeActor);
     setEditingEvent(null);
@@ -507,13 +708,15 @@ export function CareDashboard() {
     const actionId = resolveActionId(event.kind);
     const action = actionById(actionId);
     const presetId = resolvePresetId(event);
-    const preset = action?.presets.find((candidate) => candidate.id === presetId) ?? action?.presets[0];
+    const presets = action ? getActionPresets(action, event.actor, snapshot?.events ?? []) : [];
+    const preset = presets.find((candidate) => candidate.id === presetId) ?? presets[0];
 
     setSheetActionId(actionId);
-    setSelectedPresetId(presetId);
+    setSelectedPresetId(preset?.id ?? presetId);
     setInputValue(extractInputValue(event) || preset?.defaultInput || "");
+    setFieldValues({ ...getDefaultFieldValues(preset), ...getEventFieldValues(event) });
     setTimeValue(toTimeInput(event.occurredAt));
-    setSheetActor(activeActor);
+    setSheetActor(event.actor);
     setEditingEvent(event);
   };
 
@@ -521,6 +724,7 @@ export function CareDashboard() {
     setSheetActionId(null);
     setSelectedPresetId("");
     setInputValue("");
+    setFieldValues({});
     setEditingEvent(null);
   };
 
@@ -533,12 +737,17 @@ export function CareDashboard() {
       return;
     }
 
+    if (currentAction.id === "growth" && !fieldValues.weightKg?.trim() && !fieldValues.heightCm?.trim()) {
+      return;
+    }
+
     setSubmitting(true);
     try {
       const draft = currentPreset.buildDraft({
         actor: editingEvent ? editingEvent.actor : sheetActor,
         occurredAt: combineDateAndTime(editingEvent?.occurredAt ?? new Date().toISOString(), timeValue),
         inputValue,
+        fieldValues,
       });
 
       if (editingEvent) {
@@ -642,6 +851,33 @@ export function CareDashboard() {
     },
   ];
 
+  const latestGrowth = snapshot.events.find((event) => event.kind === "GROWTH");
+  const filteredFeedEvents = snapshot.events.filter((event) => {
+    const matchesKind = feedKindFilter === "ALL" || event.kind === feedKindFilter;
+    const matchesActor = feedActorFilter === "ALL" || event.actor === feedActorFilter;
+    return matchesKind && matchesActor;
+  });
+  const feedGroups = filteredFeedEvents.reduce<Array<{ key: string; title: string; events: CareEventRecord[] }>>((groups, event) => {
+    const key = dayKey(event.occurredAt);
+    const current = groups.find((group) => group.key === key);
+    if (current) {
+      current.events.push(event);
+      return groups;
+    }
+
+    groups.push({
+      key,
+      title: dayTitle(event.occurredAt),
+      events: [event],
+    });
+    return groups;
+  }, []);
+  const exportFilters = {
+    period: exportPeriodId,
+    kind: exportKindFilter === "ALL" ? "all" : exportKindFilter,
+    actor: exportActorFilter === "ALL" ? "all" : exportActorFilter,
+  };
+
   const renderHome = () => (
     <>
       <section className="dashboard-section">
@@ -655,9 +891,6 @@ export function CareDashboard() {
               </div>
             </div>
             <div className="status-pills">
-              <Pill tone={online ? "good" : "warn"}>{online ? "Онлайн" : "Оффлайн"}</Pill>
-              {pendingCount > 0 ? <Pill tone="warn">В очереди: {pendingCount}</Pill> : null}
-              {syncing ? <Pill tone="default">Синхронизация…</Pill> : null}
               <div className="theme-switch" aria-label="Тема приложения">
                 <button
                   type="button"
@@ -695,6 +928,17 @@ export function CareDashboard() {
               </button>
             )}
           </div>
+          <div className="home-focus-grid">
+            <Surface>
+              <InlineMetric label="Кормление" value={snapshot.overview.lastFeeding} helper="последняя запись" />
+            </Surface>
+            <Surface>
+              <InlineMetric label="Сон" value={snapshot.overview.sleepStatus} helper="текущий статус" />
+            </Surface>
+            <Surface>
+              <InlineMetric label="Вес и рост" value={latestGrowth?.summary ?? "ещё не измеряли"} helper="последний контроль" />
+            </Surface>
+          </div>
         </Card>
       </section>
 
@@ -719,7 +963,7 @@ export function CareDashboard() {
                 key={action.id}
                 icon={action.icon}
                 title={action.title}
-                subtitle={action.subtitle}
+                subtitle={actionSubtitle(action, activeActor)}
                 onClick={() => openCreateSheet(action.id)}
               />
             ))}
@@ -803,7 +1047,7 @@ export function CareDashboard() {
               key={action.id}
               icon={action.icon}
               title={action.title}
-              subtitle={action.subtitle}
+              subtitle={actionSubtitle(action, activeActor)}
               onClick={() => openCreateSheet(action.id)}
             />
           ))}
@@ -816,24 +1060,63 @@ export function CareDashboard() {
     <section className="dashboard-section">
       <Card>
         <SectionTitle eyebrow="Все действия" title="Семейная лента" />
-        <div className="timeline-list">
-          {snapshot.events.length ? (
-            snapshot.events.map((event) => (
-              <Surface key={event.id} style={{ padding: 18 }}>
-                <TimelineItem
-                  title={event.summary}
-                  subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}${event.editedAt ? " • исправлено" : ""}`}
-                  meta={formatDateTime(event.occurredAt)}
-                  accent={accentFromEvent(event.kind)}
-                  action={<GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>}
-                />
-                <div style={{ marginTop: 14 }}>
-                  <Pill tone={toneFromEvent(event)}>{event.source === "local" ? "Локально/синхронизируется" : "В базе семьи"}</Pill>
+        <div className="filter-panel">
+          <div className="filter-row">
+            {kindFilterOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={feedKindFilter === option.id ? "filter-chip active" : "filter-chip"}
+                onClick={() => setFeedKindFilter(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="filter-row">
+            {actorFilterOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={feedActorFilter === option.id ? "filter-chip active" : "filter-chip"}
+                onClick={() => setFeedActorFilter(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="feed-list">
+          {feedGroups.length ? (
+            feedGroups.map((group) => (
+              <div className="feed-day-group" key={group.key}>
+                <div className="feed-day-header">
+                  <span>{group.title}</span>
+                  <span>{group.events.length}</span>
                 </div>
-              </Surface>
+                {group.events.map((event) => (
+                  <Surface key={event.id} className="feed-card">
+                    <div className="feed-card-icon" style={{ background: accentFromEvent(event.kind) }}>{eventIcon(event.kind)}</div>
+                    <div className="feed-card-main">
+                      <div className="feed-card-top">
+                        <div>
+                          <div className="feed-card-title">{event.summary}</div>
+                          <div className="feed-card-meta">
+                            {actorLabel(event.actor)} • {eventKindLabel(event.kind)} • {formatDateTime(event.occurredAt)}
+                          </div>
+                        </div>
+                        <GhostButton onClick={() => openEditSheet(event)}>Исправить</GhostButton>
+                      </div>
+                      <div className="feed-card-badges">
+                        <Pill tone={toneFromEvent(event)}>{event.editedAt ? "Исправлено" : event.source === "local" ? "Синхронизация" : "Сохранено"}</Pill>
+                      </div>
+                    </div>
+                  </Surface>
+                ))}
+              </div>
             ))
           ) : (
-            <EmptyState title="Событий пока нет" description="Начните с кормления, сна или подгузника. Здесь не будет демо-записей." />
+            <EmptyState title="Событий по фильтру нет" description="Измените фильтр или добавьте новую запись в лог." />
           )}
         </div>
       </Card>
@@ -890,6 +1173,53 @@ export function CareDashboard() {
     <section className="dashboard-section dashboard-two-columns">
       <Card>
         <SectionTitle eyebrow="Для врача" title="Экспорт данных" />
+        <div className="export-filter-grid">
+          <Surface>
+            <div className="filter-title">Период</div>
+            <div className="filter-row">
+              {snapshot.periodSummaries.map((summary) => (
+                <button
+                  key={summary.id}
+                  type="button"
+                  className={exportPeriodId === summary.id ? "filter-chip active" : "filter-chip"}
+                  onClick={() => setExportPeriodId(summary.id)}
+                >
+                  {summary.title}
+                </button>
+              ))}
+            </div>
+          </Surface>
+          <Surface>
+            <div className="filter-title">Тип события</div>
+            <div className="filter-row">
+              {kindFilterOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={exportKindFilter === option.id ? "filter-chip active" : "filter-chip"}
+                  onClick={() => setExportKindFilter(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </Surface>
+          <Surface>
+            <div className="filter-title">Родитель</div>
+            <div className="filter-row">
+              {actorFilterOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={exportActorFilter === option.id ? "filter-chip active" : "filter-chip"}
+                  onClick={() => setExportActorFilter(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </Surface>
+        </div>
         <div className="stack-list">
           <Surface>
             <div style={{ fontSize: 18, fontWeight: 700 }}>PDF</div>
@@ -897,7 +1227,7 @@ export function CareDashboard() {
               Аккуратная сводка по периодам, текущему статусу и событиям для врача.
             </div>
             <div style={{ marginTop: 16 }}>
-              <PrimaryButton onClick={() => void downloadExport("pdf")}>Скачать PDF</PrimaryButton>
+              <PrimaryButton onClick={() => void downloadExport("pdf", exportFilters)}>Скачать PDF</PrimaryButton>
             </div>
           </Surface>
           <Surface>
@@ -906,7 +1236,7 @@ export function CareDashboard() {
               CSV с периодами, событиями, родителем, временем и деталями для анализа.
             </div>
             <div style={{ marginTop: 16 }}>
-              <PrimaryButton onClick={() => void downloadExport("csv")}>Скачать CSV</PrimaryButton>
+              <PrimaryButton onClick={() => void downloadExport("csv", exportFilters)}>Скачать CSV</PrimaryButton>
             </div>
           </Surface>
         </div>
@@ -980,7 +1310,13 @@ export function CareDashboard() {
                     <button
                       key={actor}
                       type="button"
-                      onClick={() => setSheetActor(actor)}
+                      onClick={() => {
+                        const nextPreset = currentAction ? getActionPresets(currentAction, actor, snapshot.events)[0] : undefined;
+                        setSheetActor(actor);
+                        setSelectedPresetId(nextPreset?.id ?? "");
+                        setInputValue(nextPreset?.defaultInput ?? "");
+                        setFieldValues(getDefaultFieldValues(nextPreset));
+                      }}
                       className={actor === sheetActor ? "actor-chip active" : "actor-chip"}
                     >
                       {actorLabel(actor)}
@@ -995,7 +1331,7 @@ export function CareDashboard() {
             ) : null}
 
             <div className="preset-list">
-              {currentAction.presets.map((preset) => (
+              {currentPresets.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
@@ -1003,6 +1339,7 @@ export function CareDashboard() {
                   onClick={() => {
                     setSelectedPresetId(preset.id);
                     setInputValue(preset.defaultInput ?? "");
+                    setFieldValues(getDefaultFieldValues(preset));
                   }}
                 >
                   <div style={{ fontSize: 16, fontWeight: 700 }}>{preset.label}</div>
@@ -1026,6 +1363,27 @@ export function CareDashboard() {
                   onChange={(event) => setInputValue(event.target.value)}
                 />
               </label>
+            ) : null}
+
+            {currentPreset.fields?.length ? (
+              <div className="field-grid">
+                {currentPreset.fields.map((field) => (
+                  <label className="field" key={field.id}>
+                    <span>{field.label}</span>
+                    <input
+                      type={field.inputType ?? "text"}
+                      value={fieldValues[field.id] ?? ""}
+                      placeholder={field.inputPlaceholder}
+                      onChange={(event) =>
+                        setFieldValues((current) => ({
+                          ...current,
+                          [field.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
             ) : null}
 
             <div className="sheet-footer">

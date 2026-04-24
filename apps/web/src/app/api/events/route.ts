@@ -6,6 +6,9 @@ import type { EventDraft } from "@/lib/types";
 
 function errorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("Breastfeeding")) {
+    return 400;
+  }
   return message.includes("Telegram") ? 403 : 500;
 }
 

@@ -68,12 +68,12 @@ export interface DailySummary {
   growthReadingsCount?: number;
 }
 
-export type SummaryPeriodId = "1d" | "3d" | "7d" | "30d" | "365d";
+export type SummaryPeriodId = "1d" | "3d" | "7d" | "30d" | "365d" | "all";
 
 export interface PeriodSummary extends DailySummary {
   id: SummaryPeriodId;
   title: string;
-  days: number;
+  days: number | null;
 }
 
 export interface TimerState {

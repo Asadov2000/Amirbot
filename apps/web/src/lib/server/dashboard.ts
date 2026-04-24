@@ -328,6 +328,12 @@ function buildIdempotencyKey(
   return createHash("sha256").update(raw).digest("hex");
 }
 
+function assertActorCanCreateDraft(draft: EventDraft, actor: ActorId) {
+  if (actor === "dad" && draft.kind === "FEEDING" && draft.payload.mode === "BREAST") {
+    throw new Error("Breastfeeding is available only for mom");
+  }
+}
+
 function toCreateInput(
   draft: EventDraft,
   context: DefaultFamilyContext,
@@ -520,6 +526,8 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
 }
 
 export async function createDashboardEvent(draft: EventDraft, actor: ActorId = draft.actor): Promise<CareEventRecord> {
+  assertActorCanCreateDraft(draft, actor);
+
   try {
     const context = await ensureDefaultFamilyContext();
     const created = await careEventRepository.create(toCreateInput(draft, context, actor));
@@ -554,6 +562,7 @@ export async function updateDashboardEvent(
     }
 
     const currentActor = resolveActor(current.createdByUserId, context);
+    assertActorCanCreateDraft(draft, currentActor);
     const nextCreateInput = toCreateInput(draft, context, currentActor, `replace:${id}:${current.revision + 1}`);
     const typeChanged = current.type !== nextCreateInput.type;
 

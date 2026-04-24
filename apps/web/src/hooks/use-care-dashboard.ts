@@ -259,8 +259,20 @@ export function useCareDashboard() {
     setSnapshot((current) => (current ? upsertSnapshotEvent(current, event) : current));
   };
 
-  const downloadExport = useEffectEvent(async (format: "pdf" | "csv") => {
-    const response = await fetch(`/api/exports?format=${format}`);
+  const downloadExport = useEffectEvent(
+    async (
+      format: "pdf" | "csv",
+      filters?: {
+        period?: string;
+        kind?: string;
+        actor?: string;
+      },
+    ) => {
+    const params = new URLSearchParams({ format });
+    if (filters?.period) params.set("period", filters.period);
+    if (filters?.kind) params.set("kind", filters.kind);
+    if (filters?.actor) params.set("actor", filters.actor);
+    const response = await fetch(`/api/exports?${params.toString()}`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -268,7 +280,8 @@ export function useCareDashboard() {
     anchor.download = format === "pdf" ? "care-summary.pdf" : "care-summary.csv";
     anchor.click();
     URL.revokeObjectURL(url);
-  });
+    },
+  );
 
   return {
     snapshot,

@@ -5,7 +5,8 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { actorLabel, formatDuration } from "../format";
-import type { CareEventRecord, DashboardSnapshot, PeriodSummary } from "../types";
+import { buildSnapshotFromEvents } from "../mock-data";
+import type { ActorId, CareEventKind, CareEventRecord, DashboardSnapshot, PeriodSummary, SummaryPeriodId } from "../types";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -17,6 +18,93 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
   timeStyle: "short",
   timeZone: "Europe/Moscow",
 });
+
+export interface ExportFilters {
+  period?: string | null;
+  kind?: string | null;
+  actor?: string | null;
+}
+
+const PERIOD_DAYS: Record<SummaryPeriodId, number | null> = {
+  "1d": 1,
+  "3d": 3,
+  "7d": 7,
+  "30d": 30,
+  "365d": 365,
+  all: null,
+};
+
+function exportPeriodStart(period: SummaryPeriodId | "all" | null | undefined): number {
+  const days = period && period in PERIOD_DAYS ? PERIOD_DAYS[period as SummaryPeriodId] : null;
+
+  if (days === null) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  start.setDate(start.getDate() - days + 1);
+  return start.getTime();
+}
+
+function normalizePeriod(value: unknown): SummaryPeriodId | "all" {
+  return typeof value === "string" && value in PERIOD_DAYS ? (value as SummaryPeriodId) : "all";
+}
+
+function normalizeKind(value: unknown): CareEventKind | "all" {
+  const allowed: Array<CareEventKind | "all"> = [
+    "all",
+    "FEEDING",
+    "SOLID_FOOD",
+    "SLEEP",
+    "DIAPER",
+    "TEMPERATURE",
+    "MEDICATION",
+    "GROWTH",
+    "NOTE",
+  ];
+  return allowed.includes(value as CareEventKind | "all") ? (value as CareEventKind | "all") : "all";
+}
+
+function normalizeActor(value: unknown): ActorId | "all" {
+  return value === "mom" || value === "dad" ? value : "all";
+}
+
+export function filterSnapshotForExport(snapshot: DashboardSnapshot, filters: ExportFilters): DashboardSnapshot {
+  const period = normalizePeriod(filters.period);
+  const kind = normalizeKind(filters.kind);
+  const actor = normalizeActor(filters.actor);
+  const start = exportPeriodStart(period);
+  const events = snapshot.events.filter((event) => {
+    const inPeriod = new Date(event.occurredAt).getTime() >= start;
+    const inKind = kind === "all" || event.kind === kind;
+    const inActor = actor === "all" || event.actor === actor;
+    return inPeriod && inKind && inActor;
+  });
+
+  return buildSnapshotFromEvents(events, snapshot.child);
+}
+
+export function describeExportFilters(filters: ExportFilters): string {
+  const period = normalizePeriod(filters.period);
+  const kind = normalizeKind(filters.kind);
+  const actor = normalizeActor(filters.actor);
+  const periodLabel =
+    period === "all"
+      ? "все время"
+      : period === "1d"
+        ? "1 день"
+        : period === "3d"
+          ? "3 дня"
+          : period === "7d"
+            ? "неделя"
+            : period === "30d"
+              ? "месяц"
+              : "год";
+  const kindLabel = kind === "all" ? "все события" : eventKindLabel(kind);
+  const actorText = actor === "all" ? "оба родителя" : actorLabel(actor);
+  return `Фильтр: ${periodLabel}, ${kindLabel}, ${actorText}`;
+}
 
 function eventKindLabel(kind: CareEventRecord["kind"]): string {
   switch (kind) {
@@ -60,8 +148,13 @@ function eventDetails(event: CareEventRecord): string {
       return `${event.payload.temperatureC ?? ""} °C`;
     case "MEDICATION":
       return `${event.payload.medication ?? ""} ${event.payload.dose ?? ""}`.trim();
-    case "GROWTH":
-      return String(event.payload.note ?? event.summary);
+    case "GROWTH": {
+      const parts = [
+        event.payload.weightKg ? `${event.payload.weightKg} кг` : "",
+        event.payload.heightCm ? `${event.payload.heightCm} см` : "",
+      ].filter(Boolean);
+      return parts.join(", ") || String(event.payload.note ?? event.summary);
+    }
     case "NOTE":
     default:
       return String(event.payload.note ?? "");
@@ -144,7 +237,7 @@ function drawWrappedText(
   return cursorY;
 }
 
-export async function createSummaryPdf(snapshot: DashboardSnapshot): Promise<Uint8Array> {
+export async function createSummaryPdf(snapshot: DashboardSnapshot, filterLabel?: string): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await embedCyrillicFont(pdf);
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -184,6 +277,14 @@ export async function createSummaryPdf(snapshot: DashboardSnapshot): Promise<Uin
     cursorY,
     { size: 12, maxWidth: PAGE_WIDTH - MARGIN * 2, color: rgb(0.74, 0.82, 0.9) },
   );
+  if (filterLabel) {
+    cursorY -= 18;
+    drawWrappedText(page, font, filterLabel, MARGIN, cursorY, {
+      size: 11,
+      maxWidth: PAGE_WIDTH - MARGIN * 2,
+      color: rgb(0.42, 0.91, 0.98),
+    });
+  }
 
   cursorY = PAGE_HEIGHT - 150;
   page.drawText("Периоды", { x: MARGIN, y: cursorY, size: 17, font, color: rgb(0.97, 0.99, 1) });
@@ -250,12 +351,13 @@ function csvEscape(value: unknown): string {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
-export function createSummaryCsv(snapshot: DashboardSnapshot): string {
+export function createSummaryCsv(snapshot: DashboardSnapshot, filterLabel?: string): string {
   const rows: unknown[][] = [
     ["Раздел", "Показатель", "Значение"],
     ["Ребёнок", "Имя", snapshot.child.name],
     ["Ребёнок", "Возраст", snapshot.child.ageLabel],
     ["Экспорт", "Сформирован", dateTimeFormatter.format(new Date(snapshot.generatedAt))],
+    ["Экспорт", "Фильтр", filterLabel ?? "без фильтра"],
     [],
     ["Период", "Сводка", "Значение"],
     ...snapshot.periodSummaries.map((summary) => [summary.title, "Статистика", periodLine(summary)]),

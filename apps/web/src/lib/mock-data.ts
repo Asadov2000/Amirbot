@@ -26,22 +26,27 @@ function baseEvents(): CareEventRecord[] {
   return [];
 }
 
-const SUMMARY_PERIODS: Array<{ id: SummaryPeriodId; title: string; days: number }> = [
+const SUMMARY_PERIODS: Array<{ id: SummaryPeriodId; title: string; days: number | null }> = [
   { id: "1d", title: "1 день", days: 1 },
   { id: "3d", title: "3 дня", days: 3 },
   { id: "7d", title: "Неделя", days: 7 },
   { id: "30d", title: "Месяц", days: 30 },
   { id: "365d", title: "Год", days: 365 },
+  { id: "all", title: "Все время", days: null },
 ];
 
-function periodStart(days: number): number {
+function periodStart(days: number | null): number {
+  if (days === null) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   start.setDate(start.getDate() - days + 1);
   return start.getTime();
 }
 
-function getSummary(events: CareEventRecord[], days = 1): DailySummary {
+function getSummary(events: CareEventRecord[], days: number | null = 1): DailySummary {
   const periodEvents = events.filter((event) => new Date(event.occurredAt).getTime() >= periodStart(days));
   const feedingEvents = periodEvents.filter((event) => event.kind === "FEEDING");
   const diaperEvents = periodEvents.filter((event) => event.kind === "DIAPER");
