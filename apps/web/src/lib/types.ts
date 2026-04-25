@@ -29,6 +29,8 @@ export interface ChildProfile {
 export interface CareEventRecord {
   id: string;
   idempotencyKey: string;
+  clientRequestId?: string;
+  revision?: number;
   kind: CareEventKind;
   actor: ActorId;
   occurredAt: string;
@@ -120,4 +122,6 @@ export interface EventDraft {
   summary: string;
   payload: Record<string, string | number | boolean | null>;
   status?: EventStatus;
+  clientRequestId?: string;
+  expectedRevision?: number;
 }

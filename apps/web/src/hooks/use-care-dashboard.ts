@@ -3,17 +3,20 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 
 import {
-  enqueuePendingEvent,
+  enqueuePendingOperation,
+  getCachedSnapshot,
   getEventOverrides,
   getLocalEvents,
-  getPendingEvents,
+  getPendingOperations,
   getStoredActor,
   removeEventOverride,
   removeLocalEvent,
-  removePendingEvent,
+  removePendingOperation,
   saveEventOverride,
+  saveCachedSnapshot,
   setStoredActor,
   upsertLocalEvent,
+  type PendingSyncOperation,
 } from "@/lib/offline-queue";
 import {
   createBaseSnapshot,
@@ -34,6 +37,16 @@ import type {
 } from "@/lib/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
+const SYNC_INTERVAL_MS = 15_000;
+
+class ApiRequestError extends Error {
+  public constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+  }
+}
 
 interface SessionResponse {
   ok: boolean;
@@ -59,10 +72,101 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   }).finally(() => window.clearTimeout(timeoutId));
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    let message = `Request failed: ${response.status}`;
+    try {
+      const payload = (await response.json()) as { error?: string };
+      message = payload.error ?? message;
+    } catch {
+      // Keep the status-only message when the response is not JSON.
+    }
+    throw new ApiRequestError(message, response.status);
   }
 
   return (await response.json()) as T;
+}
+
+function createClientRequestId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getEventClientRequestId(event: CareEventRecord) {
+  return (
+    event.clientRequestId ??
+    (typeof event.payload.clientRequestId === "string"
+      ? event.payload.clientRequestId
+      : undefined)
+  );
+}
+
+function normalizeDraftForSync(
+  draft: EventDraft,
+  clientRequestId = draft.clientRequestId ?? createClientRequestId(),
+) {
+  return {
+    ...draft,
+    clientRequestId,
+    payload: {
+      ...draft.payload,
+      clientRequestId,
+    },
+  } satisfies EventDraft;
+}
+
+function draftFromEventRecord(
+  event: CareEventRecord,
+  expectedRevision = event.revision,
+) {
+  const clientRequestId =
+    getEventClientRequestId(event) ??
+    event.idempotencyKey ??
+    createClientRequestId();
+
+  return normalizeDraftForSync(
+    {
+      kind: event.kind,
+      actor: event.actor,
+      occurredAt: event.occurredAt,
+      summary: event.summary,
+      payload: event.payload,
+      status: event.status,
+      expectedRevision,
+    },
+    clientRequestId,
+  );
+}
+
+function createPendingCreateOperation(
+  localEvent: CareEventRecord,
+  draft: EventDraft,
+): PendingSyncOperation {
+  return {
+    id: `create:${draft.clientRequestId ?? localEvent.id}`,
+    operation: "create",
+    localEventId: localEvent.id,
+    draft,
+    localEvent,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function createPendingUpdateOperation(
+  localEvent: CareEventRecord,
+  serverEventId: string,
+  draft: EventDraft,
+): PendingSyncOperation {
+  return {
+    id: `update:${serverEventId}`,
+    operation: "update",
+    localEventId: localEvent.id,
+    serverEventId,
+    draft,
+    localEvent,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function isLocalBrowser() {
@@ -105,9 +209,10 @@ export function useCareDashboard() {
           headers: buildTelegramHeaders(activeActor),
         },
       );
+      saveCachedSnapshot(baseSnapshot);
       const localEvents = getLocalEvents();
       const overrides = getEventOverrides();
-      const pendingEvents = getPendingEvents();
+      const pendingOperations = getPendingOperations();
       const mergedSnapshot = mergeSnapshot(
         baseSnapshot,
         localEvents,
@@ -116,18 +221,28 @@ export function useCareDashboard() {
 
       startTransition(() => {
         setSnapshot(mergedSnapshot);
-        setPendingCount(pendingEvents.length);
+        setPendingCount(pendingOperations.length);
         setError("");
       });
     } catch {
+      const cachedSnapshot = getCachedSnapshot();
+      const localEvents = getLocalEvents();
+      if (!cachedSnapshot && !isLocalBrowser() && localEvents.length === 0) {
+        startTransition(() => {
+          setPendingCount(getPendingOperations().length);
+          setError("Не удалось загрузить данные семьи. Проверьте соединение.");
+        });
+        return;
+      }
+
       const fallbackSnapshot = mergeSnapshot(
-        createBaseSnapshot(),
-        getLocalEvents(),
+        cachedSnapshot ?? createBaseSnapshot(),
+        localEvents,
         getEventOverrides(),
       );
       startTransition(() => {
         setSnapshot((current) => current ?? fallbackSnapshot);
-        setPendingCount(getPendingEvents().length);
+        setPendingCount(getPendingOperations().length);
         setError("");
       });
     } finally {
@@ -174,44 +289,111 @@ export function useCareDashboard() {
       return;
     }
 
-    const pendingEvents = getPendingEvents();
-    if (pendingEvents.length === 0) {
+    const pendingOperations = getPendingOperations();
+    if (pendingOperations.length === 0) {
       setPendingCount(0);
       return;
     }
 
     setSyncing(true);
     try {
-      for (const event of pendingEvents) {
-        const response = await fetchJson<{
-          ok: boolean;
-          event: CareEventRecord;
-        }>("/api/events", {
-          method: "POST",
-          headers: buildTelegramHeaders(event.actor),
-          body: JSON.stringify({
-            kind: event.kind,
-            actor: event.actor,
-            occurredAt: event.occurredAt,
-            summary: event.summary,
-            payload: event.payload,
-            status: event.status,
-          } satisfies EventDraft),
-        });
-        removePendingEvent(event.id);
-        removeLocalEvent(event.id);
-        removeEventOverride(event.id);
-        startTransition(() => {
-          setSnapshot((current) =>
-            current ? upsertSnapshotEvent(current, response.event) : current,
-          );
-        });
+      for (const operation of pendingOperations) {
+        try {
+          const response =
+            operation.operation === "create"
+              ? await fetchJson<{
+                  ok: boolean;
+                  event: CareEventRecord;
+                }>("/api/events", {
+                  method: "POST",
+                  headers: buildTelegramHeaders(operation.draft.actor),
+                  body: JSON.stringify(operation.draft),
+                })
+              : await fetchJson<{
+                  ok: boolean;
+                  event: CareEventRecord;
+                }>("/api/events", {
+                  method: "PUT",
+                  headers: buildTelegramHeaders(activeActor),
+                  body: JSON.stringify({
+                    id: operation.serverEventId,
+                    draft: operation.draft,
+                  }),
+                });
+
+          removePendingOperation(operation.id);
+          removeLocalEvent(operation.localEventId);
+          removeEventOverride(operation.localEventId);
+          if (operation.operation === "update") {
+            removeEventOverride(operation.serverEventId);
+          }
+
+          startTransition(() => {
+            setSnapshot((current) =>
+              current ? upsertSnapshotEvent(current, response.event) : current,
+            );
+          });
+        } catch (error) {
+          if (error instanceof ApiRequestError && error.statusCode === 409) {
+            removePendingOperation(operation.id);
+            removeLocalEvent(operation.localEventId);
+            removeEventOverride(operation.localEventId);
+            if (operation.operation === "update") {
+              removeEventOverride(operation.serverEventId);
+            }
+            setError(error.message);
+            continue;
+          }
+
+          throw error;
+        }
       }
-      setPendingCount(getPendingEvents().length);
+      setPendingCount(getPendingOperations().length);
     } finally {
       setSyncing(false);
     }
   });
+
+  const syncWithServer = useEffectEvent(async (showLoading = false) => {
+    if (accessDenied || (!actorLocked && !isLocalBrowser())) {
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setPendingCount(getPendingOperations().length);
+      return;
+    }
+
+    await syncPendingEvents();
+    await refreshSnapshot(showLoading);
+  });
+
+  useEffect(() => {
+    const syncNow = () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      void syncWithServer(false).catch(() => {
+        setPendingCount(getPendingOperations().length);
+      });
+    };
+
+    const intervalId = window.setInterval(syncNow, SYNC_INTERVAL_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncWithServer(false).catch(() => {
+          setPendingCount(getPendingOperations().length);
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     const storedActor = getStoredActor();
@@ -223,15 +405,16 @@ export function useCareDashboard() {
     setActorDisplayName(storedActor === "dad" ? "Папа" : "Мама");
     setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
 
+    const cachedSnapshot = getCachedSnapshot();
     startTransition(() => {
       setSnapshot(
         mergeSnapshot(
-          createBaseSnapshot(),
+          cachedSnapshot ?? createBaseSnapshot(),
           getLocalEvents(),
           getEventOverrides(),
         ),
       );
-      setPendingCount(getPendingEvents().length);
+      setPendingCount(getPendingOperations().length);
       setLoading(false);
     });
 
@@ -262,8 +445,9 @@ export function useCareDashboard() {
       setActorLocked(telegramActor.locked);
       setActorDisplayName(telegramActor.displayName);
       void refreshSession()
-        .then(() => {
-          void refreshSnapshot(false);
+        .then(async () => {
+          await syncPendingEvents();
+          await refreshSnapshot(false);
           void refreshAi();
         })
         .catch(() => {
@@ -286,8 +470,7 @@ export function useCareDashboard() {
   useEffect(() => {
     const onOnline = async () => {
       setOnline(true);
-      await syncPendingEvents();
-      await refreshSnapshot();
+      await syncWithServer(true);
     };
 
     const onOffline = () => setOnline(false);
@@ -311,7 +494,8 @@ export function useCareDashboard() {
   };
 
   const addEvent = useEffectEvent(async (draft: EventDraft) => {
-    const event = createEventRecord(draft, "local");
+    const syncDraft = normalizeDraftForSync(draft);
+    const event = createEventRecord(syncDraft, "local");
     const localEvents = upsertLocalEvent(event);
 
     startTransition(() => {
@@ -330,8 +514,8 @@ export function useCareDashboard() {
           event: CareEventRecord;
         }>("/api/events", {
           method: "POST",
-          headers: buildTelegramHeaders(draft.actor),
-          body: JSON.stringify(draft),
+          headers: buildTelegramHeaders(syncDraft.actor),
+          body: JSON.stringify(syncDraft),
         });
         const nextLocalEvents = removeLocalEvent(event.id);
         startTransition(() => {
@@ -345,12 +529,12 @@ export function useCareDashboard() {
           );
         });
       } catch {
-        enqueuePendingEvent(event);
-        setPendingCount(getPendingEvents().length);
+        enqueuePendingOperation(createPendingCreateOperation(event, syncDraft));
+        setPendingCount(getPendingOperations().length);
       }
     } else {
-      enqueuePendingEvent(event);
-      setPendingCount(getPendingEvents().length);
+      enqueuePendingOperation(createPendingCreateOperation(event, syncDraft));
+      setPendingCount(getPendingOperations().length);
     }
 
     return event;
@@ -362,6 +546,8 @@ export function useCareDashboard() {
       editedAt: new Date().toISOString(),
       source: "local",
     };
+    const editDraft = draftFromEventRecord(editedEvent, event.revision);
+    const shouldCreate = event.source === "local";
 
     const localEvents = upsertLocalEvent(editedEvent);
     saveEventOverride(editedEvent);
@@ -379,21 +565,23 @@ export function useCareDashboard() {
         const response = await fetchJson<{
           ok: boolean;
           event: CareEventRecord;
-        }>("/api/events", {
-          method: "PUT",
-          headers: buildTelegramHeaders(activeActor),
-          body: JSON.stringify({
-            id: editedEvent.id,
-            draft: {
-              kind: editedEvent.kind,
-              actor: editedEvent.actor,
-              occurredAt: editedEvent.occurredAt,
-              summary: editedEvent.summary,
-              payload: editedEvent.payload,
-              status: editedEvent.status,
-            } satisfies EventDraft,
-          }),
-        });
+        }>(
+          "/api/events",
+          shouldCreate
+            ? {
+                method: "POST",
+                headers: buildTelegramHeaders(editDraft.actor),
+                body: JSON.stringify(editDraft),
+              }
+            : {
+                method: "PUT",
+                headers: buildTelegramHeaders(activeActor),
+                body: JSON.stringify({
+                  id: editedEvent.id,
+                  draft: editDraft,
+                }),
+              },
+        );
         const nextLocalEvents = removeLocalEvent(editedEvent.id);
         const nextOverrides = removeEventOverride(editedEvent.id);
         startTransition(() => {
@@ -406,13 +594,37 @@ export function useCareDashboard() {
               : current,
           );
         });
-      } catch {
-        enqueuePendingEvent(editedEvent);
-        setPendingCount(getPendingEvents().length);
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.statusCode === 409) {
+          removeLocalEvent(editedEvent.id);
+          removeEventOverride(editedEvent.id);
+          setError(error.message);
+          await refreshSnapshot(false);
+          return;
+        }
+
+        enqueuePendingOperation(
+          shouldCreate
+            ? createPendingCreateOperation(editedEvent, editDraft)
+            : createPendingUpdateOperation(
+                editedEvent,
+                editedEvent.id,
+                editDraft,
+              ),
+        );
+        setPendingCount(getPendingOperations().length);
       }
     } else {
-      enqueuePendingEvent(editedEvent);
-      setPendingCount(getPendingEvents().length);
+      enqueuePendingOperation(
+        shouldCreate
+          ? createPendingCreateOperation(editedEvent, editDraft)
+          : createPendingUpdateOperation(
+              editedEvent,
+              editedEvent.id,
+              editDraft,
+            ),
+      );
+      setPendingCount(getPendingOperations().length);
     }
   });
 

@@ -14,6 +14,7 @@ const EVENT_KINDS = new Set([
 const STATUSES = new Set(["LOGGED", "STARTED", "COMPLETED"]);
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_PAYLOAD_STRING_LENGTH = 500;
+const MAX_CLIENT_REQUEST_ID_LENGTH = 128;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -139,6 +140,33 @@ export function validateEventDraft(value: unknown): EventDraft {
     );
   }
 
+  if (
+    value.clientRequestId !== undefined &&
+    (typeof value.clientRequestId !== "string" ||
+      value.clientRequestId.trim().length === 0 ||
+      value.clientRequestId.length > MAX_CLIENT_REQUEST_ID_LENGTH)
+  ) {
+    throw new ApiError(
+      "Event clientRequestId is invalid",
+      400,
+      "Некорректный ключ синхронизации.",
+    );
+  }
+
+  const expectedRevision = value.expectedRevision;
+  if (
+    expectedRevision !== undefined &&
+    (typeof expectedRevision !== "number" ||
+      !Number.isInteger(expectedRevision) ||
+      expectedRevision < 1)
+  ) {
+    throw new ApiError(
+      "Event expectedRevision is invalid",
+      400,
+      "Некорректная версия записи.",
+    );
+  }
+
   validateOccurredAt(value.occurredAt);
   validatePayload(value.payload);
 
@@ -149,5 +177,7 @@ export function validateEventDraft(value: unknown): EventDraft {
     summary: value.summary.trim(),
     payload: value.payload,
     status: value.status as EventDraft["status"],
+    clientRequestId: value.clientRequestId?.trim(),
+    expectedRevision,
   };
 }

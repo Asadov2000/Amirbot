@@ -431,17 +431,35 @@ export function createEventRecord(
   draft: EventDraft,
   source: "server" | "local" = "local",
 ): CareEventRecord {
+  const clientRequestId = draft.clientRequestId ?? createId("client");
+
   return {
     id: createId("evt"),
-    idempotencyKey: createId("idem"),
+    idempotencyKey: clientRequestId,
+    clientRequestId,
+    revision: draft.expectedRevision,
     kind: draft.kind,
     actor: draft.actor,
     occurredAt: draft.occurredAt,
     summary: draft.summary,
-    payload: draft.payload,
+    payload: {
+      ...draft.payload,
+      clientRequestId,
+    },
     status: draft.status ?? "LOGGED",
     source,
   };
+}
+
+function getEventSyncKey(event: CareEventRecord) {
+  return (
+    (event.clientRequestId ??
+      (typeof event.payload.clientRequestId === "string"
+        ? event.payload.clientRequestId
+        : undefined) ??
+      event.idempotencyKey) ||
+    event.id
+  );
 }
 
 export function mergeSnapshot(
@@ -452,7 +470,7 @@ export function mergeSnapshot(
   const deduped = new Map<string, CareEventRecord>();
 
   [...snapshot.events, ...localEvents].forEach((event) => {
-    const key = event.idempotencyKey || event.id;
+    const key = getEventSyncKey(event);
     deduped.set(key, { ...event, ...(overrides[event.id] ?? {}) });
   });
 
@@ -473,9 +491,12 @@ export function upsertSnapshotEvent(
   snapshot: DashboardSnapshot,
   event: CareEventRecord,
 ): DashboardSnapshot {
+  const syncKey = getEventSyncKey(event);
   const events = snapshot.events.filter(
     (item) =>
-      item.id !== event.id && item.idempotencyKey !== event.idempotencyKey,
+      item.id !== event.id &&
+      item.idempotencyKey !== event.idempotencyKey &&
+      getEventSyncKey(item) !== syncKey,
   );
   const quickItems = new Map(
     snapshot.quickItems.map((item) => [item.key, item]),

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { CareEventRepository, prisma } from "@amir/db";
 
+import { ApiError } from "./api-security";
 import {
   buildSnapshotFromEvents,
   createBaseSnapshot,
@@ -24,6 +25,8 @@ import {
 const careEventRepository = new CareEventRepository(prisma);
 const isProduction =
   process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
+const allowMockWriteFallback =
+  process.env.ENABLE_MOCK_WRITE_FALLBACK === "true";
 
 interface DashboardCreateInput {
   familyId: string;
@@ -102,6 +105,14 @@ function getPayloadRecord(payload: unknown) {
   return payload as Record<string, string | number | boolean | null>;
 }
 
+function getClientRequestId(
+  payload: Record<string, string | number | boolean | null>,
+) {
+  return typeof payload.clientRequestId === "string"
+    ? payload.clientRequestId
+    : undefined;
+}
+
 function resolveActor(userId: string, context: DefaultFamilyContext): ActorId {
   return userId === context.actors.dad.userId ||
     context.actors.dad.legacyUserIds.includes(userId)
@@ -157,6 +168,7 @@ function toDashboardEventRecord(
 ): CareEventRecord | null {
   const payload = getPayloadRecord(event.payload);
   const actor = resolveActor(event.createdByUserId, context);
+  const clientRequestId = getClientRequestId(payload);
 
   switch (event.type) {
     case "BREASTFEEDING": {
@@ -168,6 +180,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "FEEDING",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -188,6 +202,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "FEEDING",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -208,6 +224,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "SLEEP",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -233,6 +251,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "DIAPER",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -258,6 +278,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "TEMPERATURE",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -278,6 +300,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "MEDICATION",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -312,6 +336,8 @@ function toDashboardEventRecord(
         return {
           id: event.id,
           idempotencyKey: event.idempotencyKey,
+          clientRequestId,
+          revision: event.revision,
           kind: dashboardKind,
           actor,
           occurredAt: event.occurredAt.toISOString(),
@@ -327,6 +353,8 @@ function toDashboardEventRecord(
       return {
         id: event.id,
         idempotencyKey: event.idempotencyKey,
+        clientRequestId,
+        revision: event.revision,
         kind: "NOTE",
         actor,
         occurredAt: event.occurredAt.toISOString(),
@@ -454,15 +482,21 @@ function buildIdempotencyKey(
 ) {
   const raw = seed
     ? seed
-    : JSON.stringify({
-        familyId: context.familyId,
-        childId: context.childId,
-        actor: draft.actor,
-        kind: draft.kind,
-        occurredAt: draft.occurredAt,
-        summary: draft.summary,
-        payload: draft.payload,
-      });
+    : draft.clientRequestId
+      ? JSON.stringify({
+          familyId: context.familyId,
+          childId: context.childId,
+          clientRequestId: draft.clientRequestId,
+        })
+      : JSON.stringify({
+          familyId: context.familyId,
+          childId: context.childId,
+          actor: draft.actor,
+          kind: draft.kind,
+          occurredAt: draft.occurredAt,
+          summary: draft.summary,
+          payload: draft.payload,
+        });
 
   return createHash("sha256").update(raw).digest("hex");
 }
@@ -496,7 +530,12 @@ function toCreateInput(
     source: "MANUAL" as const,
     idempotencyKey: buildIdempotencyKey(context, normalizedDraft, seed),
     occurredAt,
-    payload: draft.payload,
+    payload: draft.clientRequestId
+      ? {
+          ...draft.payload,
+          clientRequestId: draft.clientRequestId,
+        }
+      : draft.payload,
   };
 
   switch (draft.kind) {
@@ -749,7 +788,7 @@ export async function createDashboardEvent(
     return record;
   } catch (error) {
     logServerFallback("Falling back to mock event creation", error);
-    if (isProduction) {
+    if (isProduction || !allowMockWriteFallback) {
       throw error;
     }
     return createEventRecord(draft, "server");
@@ -774,6 +813,14 @@ export async function updateDashboardEvent(
 
     if (!current) {
       throw new Error("CareEvent not found for update");
+    }
+
+    if (draft.expectedRevision && current.revision !== draft.expectedRevision) {
+      throw new ApiError(
+        "Revision conflict",
+        409,
+        "Запись уже изменилась на другом устройстве. Лента обновлена, проверьте актуальные данные.",
+      );
     }
 
     const currentActor = resolveActor(current.createdByUserId, context);
@@ -817,7 +864,7 @@ export async function updateDashboardEvent(
     return record;
   } catch (error) {
     logServerFallback("Falling back to mock event update", error);
-    if (isProduction) {
+    if (isProduction || !allowMockWriteFallback) {
       throw error;
     }
     return {
