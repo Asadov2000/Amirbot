@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
 
-import { createDashboardEvent, updateDashboardEvent } from "@/lib/server/dashboard";
+import {
+  createDashboardEvent,
+  updateDashboardEvent,
+} from "@/lib/server/dashboard";
+import {
+  ApiError,
+  readJsonBody,
+  safeApiError,
+} from "@/lib/server/api-security";
+import { validateEventDraft } from "@/lib/server/event-draft-validation";
+import { assertRateLimit } from "@/lib/server/rate-limit";
 import { resolveRequestActor } from "@/lib/server/telegram-auth";
-import type { EventDraft } from "@/lib/types";
-
-function errorStatus(error: unknown): number {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("Breastfeeding")) {
-    return 400;
-  }
-  return message.includes("Telegram") ? 403 : 500;
-}
 
 export async function POST(request: Request) {
   try {
     const actor = resolveRequestActor(request);
-    const payload = (await request.json()) as EventDraft;
+    assertRateLimit(
+      `events:create:${actor.telegramUserId ?? actor.actor}`,
+      45,
+      60_000,
+    );
+    const payload = validateEventDraft(await readJsonBody<unknown>(request));
     const event = await createDashboardEvent(payload, actor.actor);
 
     return NextResponse.json({
@@ -23,33 +29,36 @@ export async function POST(request: Request) {
       event,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unable to create event",
-      },
-      { status: errorStatus(error) },
-    );
+    return safeApiError(error, "Не удалось сохранить событие.");
   }
 }
 
 export async function PUT(request: Request) {
   try {
     const actor = resolveRequestActor(request);
-    const payload = (await request.json()) as { id: string; draft: EventDraft };
-    const event = await updateDashboardEvent(payload.id, payload.draft, actor.actor);
+    assertRateLimit(
+      `events:update:${actor.telegramUserId ?? actor.actor}`,
+      30,
+      60_000,
+    );
+    const payload = await readJsonBody<{ id?: unknown; draft?: unknown }>(
+      request,
+    );
+    if (typeof payload.id !== "string" || payload.id.trim().length === 0) {
+      throw new ApiError("Event id is invalid", 400, "Некорректная запись.");
+    }
+
+    const event = await updateDashboardEvent(
+      payload.id,
+      validateEventDraft(payload.draft),
+      actor.actor,
+    );
 
     return NextResponse.json({
       ok: true,
       event,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unable to update event",
-      },
-      { status: errorStatus(error) },
-    );
+    return safeApiError(error, "Не удалось обновить событие.");
   }
 }

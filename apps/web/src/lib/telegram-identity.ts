@@ -27,21 +27,20 @@ export interface ClientActorContext {
   displayName: string;
   initData?: string;
   allowed: boolean;
-  deniedReason?: string;
   telegramUserId?: string;
 }
 
-const DAD_TELEGRAM_ID = "5328212518";
-const MOM_TELEGRAM_ID = "775978948";
+const DAD_USERNAME = "yamob";
+const MOM_USERNAME = "manizha_u";
 
 function actorFromUser(user?: TelegramWebAppUser): ActorId | null {
-  const telegramUserId = user?.id ? String(user.id) : "";
+  const username = user?.username?.trim().replace(/^@+/, "").toLowerCase();
 
-  if (telegramUserId === DAD_TELEGRAM_ID) {
+  if (username === DAD_USERNAME) {
     return "dad";
   }
 
-  if (telegramUserId === MOM_TELEGRAM_ID) {
+  if (username === MOM_USERNAME) {
     return "mom";
   }
 
@@ -69,24 +68,12 @@ export function resolveTelegramActor(): ClientActorContext | null {
     return null;
   }
 
-  if (!actor) {
-    return {
-      actor: "mom",
-      locked: true,
-      source: "telegram",
-      displayName: "Нет доступа",
-      allowed: false,
-      deniedReason: "Доступ открыт только маме и папе Амира.",
-      telegramUserId: user.id ? String(user.id) : undefined,
-      initData: webApp.initData || undefined,
-    };
-  }
-
   return {
-    actor,
-    locked: true,
+    actor: actor ?? "mom",
+    locked: Boolean(actor),
     source: "telegram",
-    displayName: actor === "dad" ? "Папа" : "Мама",
+    displayName:
+      actor === "dad" ? "Папа" : actor === "mom" ? "Мама" : "Проверяю доступ",
     allowed: true,
     telegramUserId: user.id ? String(user.id) : undefined,
     initData: webApp?.initData || undefined,

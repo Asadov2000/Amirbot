@@ -1,21 +1,33 @@
 import { NextResponse } from "next/server";
 
 import { deleteDashboardQuickItem } from "@/lib/server/dashboard";
+import {
+  ApiError,
+  readJsonBody,
+  safeApiError,
+} from "@/lib/server/api-security";
+import { assertRateLimit } from "@/lib/server/rate-limit";
 import { resolveRequestActor } from "@/lib/server/telegram-auth";
 import type { QuickItemKind } from "@/lib/types";
 
 export async function DELETE(request: Request) {
   try {
     const actor = resolveRequestActor(request);
-    const payload = (await request.json()) as {
+    assertRateLimit(
+      `quick-items:delete:${actor.telegramUserId ?? actor.actor}`,
+      20,
+      60_000,
+    );
+    const payload = await readJsonBody<{
       kind?: QuickItemKind;
       label?: string;
-    };
+    }>(request);
 
     if (payload.kind !== "SOLID_FOOD" && payload.kind !== "MEDICATION") {
-      return NextResponse.json(
-        { ok: false, error: "Unsupported quick item kind" },
-        { status: 400 },
+      throw new ApiError(
+        "Unsupported quick item kind",
+        400,
+        "Некорректная быстрая кнопка.",
       );
     }
 
@@ -30,14 +42,6 @@ export async function DELETE(request: Request) {
       ...result,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to delete quick item";
-    return NextResponse.json(
-      {
-        ok: false,
-        error: message,
-      },
-      { status: message.includes("Telegram") ? 403 : 500 },
-    );
+    return safeApiError(error, "Не удалось удалить быструю кнопку.");
   }
 }

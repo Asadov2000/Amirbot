@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getDashboardSnapshot } from "@/lib/server/dashboard";
+import { safeApiError } from "@/lib/server/api-security";
+import { assertRateLimit } from "@/lib/server/rate-limit";
 import {
   createSummaryCsv,
   createSummaryPdf,
@@ -9,14 +11,14 @@ import {
 } from "@/lib/server/export";
 import { resolveRequestActor } from "@/lib/server/telegram-auth";
 
-function statusFromError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Telegram") ? 403 : 500;
-}
-
 export async function GET(request: Request) {
   try {
-    resolveRequestActor(request);
+    const actor = resolveRequestActor(request);
+    assertRateLimit(
+      `exports:${actor.telegramUserId ?? actor.actor}`,
+      12,
+      60_000,
+    );
     const snapshot = await getDashboardSnapshot();
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format");
@@ -45,12 +47,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Access denied",
-      },
-      { status: statusFromError(error) },
-    );
+    return safeApiError(error, "Не удалось подготовить экспорт.");
   }
 }

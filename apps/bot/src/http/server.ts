@@ -1,4 +1,10 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 
 import type { Bot, Context } from "grammy";
 
@@ -6,6 +12,8 @@ import type { BotConfig } from "../config.js";
 import type { ReminderDispatchRequest } from "../domain/types.js";
 import type { Logger } from "../lib/logger.js";
 import { ReminderDeliveryService } from "../services/reminder-delivery.service.js";
+
+const MAX_REQUEST_BODY_BYTES = 1_048_576;
 
 export interface BotHttpServerDependencies {
   bot: Bot<Context>;
@@ -33,7 +41,7 @@ export class BotHttpServer {
     });
 
     this.dependencies.logger.info("Bot HTTP server started", {
-      port: this.dependencies.config.httpPort
+      port: this.dependencies.config.httpPort,
     });
   }
 
@@ -50,7 +58,10 @@ export class BotHttpServer {
     });
   }
 
-  private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  private async handleRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
     try {
       if (request.method === "GET" && request.url === "/healthz") {
         sendJson(response, 200, { status: "ok" });
@@ -62,7 +73,10 @@ export class BotHttpServer {
         return;
       }
 
-      if (request.method === "POST" && request.url === this.dependencies.config.webhookPath) {
+      if (
+        request.method === "POST" &&
+        request.url === this.dependencies.config.webhookPath
+      ) {
         await this.handleWebhookRequest(request, response);
         return;
       }
@@ -72,8 +86,13 @@ export class BotHttpServer {
       this.dependencies.logger.error("Bot HTTP request failed", {
         method: request.method,
         url: request.url,
-        error: getErrorMessage(error)
+        error: getErrorMessage(error),
       });
+
+      if (error instanceof HttpRequestError) {
+        sendJson(response, error.statusCode, { error: error.publicMessage });
+        return;
+      }
 
       sendJson(response, 500, { error: "Internal Server Error" });
     }
@@ -81,9 +100,14 @@ export class BotHttpServer {
 
   private async handleInternalReminderRequest(
     request: IncomingMessage,
-    response: ServerResponse
+    response: ServerResponse,
   ): Promise<void> {
-    if (!isAuthorizedInternalRequest(request, this.dependencies.config.internalApiToken)) {
+    if (
+      !isAuthorizedInternalRequest(
+        request,
+        this.dependencies.config.internalApiToken,
+      )
+    ) {
       sendJson(response, 401, { error: "Unauthorized" });
       return;
     }
@@ -95,18 +119,21 @@ export class BotHttpServer {
     await this.dependencies.reminderDeliveryService.send(payload);
     sendJson(response, 202, {
       accepted: true,
-      reminderId: payload.reminderId
+      reminderId: payload.reminderId,
     });
   }
 
   private async handleWebhookRequest(
     request: IncomingMessage,
-    response: ServerResponse
+    response: ServerResponse,
   ): Promise<void> {
     if (this.dependencies.config.webhookSecret) {
       const providedSecret = request.headers["x-telegram-bot-api-secret-token"];
 
-      if (providedSecret !== this.dependencies.config.webhookSecret) {
+      if (
+        typeof providedSecret !== "string" ||
+        !safeEqual(providedSecret, this.dependencies.config.webhookSecret)
+      ) {
         sendJson(response, 401, { error: "Invalid webhook secret" });
         return;
       }
@@ -121,16 +148,55 @@ export class BotHttpServer {
   }
 }
 
-function isAuthorizedInternalRequest(request: IncomingMessage, token: string): boolean {
+class HttpRequestError extends Error {
+  public constructor(
+    public readonly statusCode: number,
+    public readonly publicMessage: string,
+  ) {
+    super(publicMessage);
+  }
+}
+
+function isAuthorizedInternalRequest(
+  request: IncomingMessage,
+  token: string,
+): boolean {
   const authorizationHeader = request.headers.authorization;
-  return authorizationHeader === `Bearer ${token}`;
+  const bearerPrefix = "Bearer ";
+
+  return (
+    typeof authorizationHeader === "string" &&
+    authorizationHeader.startsWith(bearerPrefix) &&
+    safeEqual(authorizationHeader.slice(bearerPrefix.length), token)
+  );
 }
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
+  const contentType = request.headers["content-type"];
+  if (
+    typeof contentType === "string" &&
+    !contentType.toLowerCase().includes("application/json")
+  ) {
+    throw new HttpRequestError(415, "Unsupported Media Type");
+  }
+
+  const contentLength = Number(request.headers["content-length"] ?? 0);
+  if (contentLength > MAX_REQUEST_BODY_BYTES) {
+    throw new HttpRequestError(413, "Payload Too Large");
+  }
+
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
 
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.byteLength;
+
+    if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+      throw new HttpRequestError(413, "Payload Too Large");
+    }
+
+    chunks.push(buffer);
   }
 
   const rawBody = Buffer.concat(chunks).toString("utf8");
@@ -139,7 +205,21 @@ async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
     return {} as T;
   }
 
-  return JSON.parse(rawBody) as T;
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    throw new HttpRequestError(400, "Malformed JSON");
+  }
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }
 
 function validateReminderPayload(payload: ReminderDispatchRequest): void {
@@ -152,12 +232,16 @@ function validateReminderPayload(payload: ReminderDispatchRequest): void {
     !payload.dueAt
   ) {
     throw new Error(
-      "Reminder payload must include reminderId, familyId, chatId, title, body and dueAt"
+      "Reminder payload must include reminderId, familyId, chatId, title, body and dueAt",
     );
   }
 }
 
-function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
+function sendJson(
+  response: ServerResponse,
+  statusCode: number,
+  payload: unknown,
+): void {
   response.statusCode = statusCode;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload));

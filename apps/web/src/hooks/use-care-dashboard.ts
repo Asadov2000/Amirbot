@@ -35,6 +35,12 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
+interface SessionResponse {
+  ok: boolean;
+  actor: ActorId;
+  displayName: string;
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -57,6 +63,18 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+function isLocalBrowser() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname.endsWith(".local")
+  );
 }
 
 export function useCareDashboard() {
@@ -132,6 +150,23 @@ export function useCareDashboard() {
     } catch {
       setAiAnswer("Подсказка временно недоступна.");
     }
+  });
+
+  const refreshSession = useEffectEvent(async () => {
+    const response = await fetchJson<SessionResponse>("/api/session", {
+      headers: buildTelegramHeaders(activeActor),
+    });
+
+    startTransition(() => {
+      setActiveActor(response.actor);
+      setActorLocked(true);
+      setActorDisplayName(response.displayName);
+      setStoredActor(response.actor);
+      setAccessDenied(false);
+      setError("");
+    });
+
+    return response.actor;
   });
 
   const syncPendingEvents = useEffectEvent(async () => {
@@ -210,25 +245,33 @@ export function useCareDashboard() {
           return;
         }
 
+        if (!isLocalBrowser()) {
+          setAccessDenied(true);
+          setActorLocked(true);
+          setActorDisplayName("Нет доступа");
+          setError("Откройте приложение через Telegram аккаунт мамы или папы.");
+          return;
+        }
+
         void refreshSnapshot(false);
         void refreshAi();
-        return;
-      }
-
-      if (!telegramActor.allowed) {
-        setAccessDenied(true);
-        setActorLocked(true);
-        setActorDisplayName("Нет доступа");
-        setError(telegramActor.deniedReason ?? "Доступ закрыт.");
         return;
       }
 
       setActiveActor(telegramActor.actor);
       setActorLocked(telegramActor.locked);
       setActorDisplayName(telegramActor.displayName);
-      setStoredActor(telegramActor.actor);
-      void refreshSnapshot(false);
-      void refreshAi();
+      void refreshSession()
+        .then(() => {
+          void refreshSnapshot(false);
+          void refreshAi();
+        })
+        .catch(() => {
+          setAccessDenied(true);
+          setActorLocked(true);
+          setActorDisplayName("Нет доступа");
+          setError("Доступ открыт только маме и папе Амира.");
+        });
     };
 
     resolveTelegram();
