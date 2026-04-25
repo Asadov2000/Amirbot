@@ -450,11 +450,15 @@ export function useCareDashboard() {
           await refreshSnapshot(false);
           void refreshAi();
         })
-        .catch(() => {
+        .catch((error) => {
           setAccessDenied(true);
           setActorLocked(true);
           setActorDisplayName("Нет доступа");
-          setError("Доступ открыт только маме и папе Амира.");
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Доступ открыт только маме и папе Амира.",
+          );
         });
     };
 

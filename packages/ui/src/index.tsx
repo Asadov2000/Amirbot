@@ -9,20 +9,23 @@ import type {
 const styles = {
   card: {
     border: "1px solid var(--border)",
-    borderRadius: 24,
+    borderRadius: 30,
     background: "var(--card-bg)",
-    boxShadow: "var(--shadow)",
-    backdropFilter: "blur(22px)",
+    boxShadow: "var(--inner-highlight), var(--shadow)",
+    backdropFilter: "blur(30px) saturate(180%)",
   } satisfies CSSProperties,
   surface: {
-    borderRadius: 22,
+    borderRadius: 24,
     background: "var(--surface)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--inner-highlight)",
+    backdropFilter: "blur(22px) saturate(160%)",
   } satisfies CSSProperties,
   pill: {
     borderRadius: 999,
     background: "var(--surface-strong)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--inner-highlight)",
   } satisfies CSSProperties,
 };
 
@@ -96,15 +99,26 @@ export function SectionTitle({
           <div
             style={{
               fontSize: 12,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
               color: "var(--muted)",
+              fontWeight: 700,
             }}
           >
             {eyebrow}
           </div>
         ) : null}
-        <h2 style={{ margin: 0, fontSize: 22, lineHeight: 1.1 }}>{title}</h2>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 24,
+            lineHeight: 1.06,
+            letterSpacing: "-0.035em",
+            fontWeight: 820,
+          }}
+        >
+          {title}
+        </h2>
       </div>
       {action}
     </div>
@@ -130,15 +144,16 @@ export function StatTile({
         display: "grid",
         alignContent: "space-between",
         gap: 12,
-        background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 14%, var(--surface)), var(--surface))`,
+        background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 13%, var(--surface-strong)), var(--surface))`,
       }}
     >
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
       <div
         style={{
           fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
-          fontWeight: 800,
+          fontWeight: 820,
           lineHeight: 1,
+          letterSpacing: "-0.04em",
         }}
       >
         {value}
@@ -181,12 +196,13 @@ export function ActionButton({
           color: "inherit",
           cursor: "pointer",
           background: selected
-            ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), color-mix(in srgb, var(--accent-2) 16%, var(--surface)))"
-            : "linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 74%, transparent))",
+            ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 24%, var(--surface-strong)), color-mix(in srgb, var(--accent-2) 12%, var(--surface)))"
+            : "linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 72%, transparent))",
           transform: selected ? "translateY(-1px)" : "none",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+          boxShadow: "var(--inner-highlight), 0 10px 22px rgba(0,0,0,0.08)",
           transition:
             "transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
+          touchAction: "manipulation",
         },
         style,
       )}
@@ -201,13 +217,18 @@ export function ActionButton({
             padding: "6px 10px",
             fontSize: 12,
             color: "var(--muted)",
+            fontWeight: 650,
           }}
         >
           {selected ? "Выбрано" : "Быстро"}
         </span>
       </div>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
+        <div
+          style={{ fontSize: 18, fontWeight: 760, letterSpacing: "-0.01em" }}
+        >
+          {title}
+        </div>
         {subtitle ? (
           <div
             style={{ marginTop: 4, color: "var(--muted-strong)", fontSize: 13 }}
@@ -332,6 +353,8 @@ export function GhostButton({
           color: "inherit",
           cursor: "pointer",
           background: "color-mix(in srgb, var(--surface) 82%, transparent)",
+          fontWeight: 700,
+          touchAction: "manipulation",
         },
         style,
       )}
@@ -352,17 +375,18 @@ export function PrimaryButton({
       style={mergeStyles(
         {
           border: "none",
-          borderRadius: 24,
+          borderRadius: 22,
           minHeight: 58,
           padding: "14px 18px",
           color: "var(--primary-text)",
           background:
-            "linear-gradient(135deg, var(--accent), var(--accent-2) 60%, var(--accent-3))",
+            "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 76%, var(--accent-2)) 62%, var(--accent-3))",
           fontSize: 16,
-          fontWeight: 800,
+          fontWeight: 760,
           cursor: "pointer",
           boxShadow:
-            "0 18px 34px color-mix(in srgb, var(--accent) 18%, transparent)",
+            "var(--inner-highlight), 0 18px 34px color-mix(in srgb, var(--accent) 20%, transparent)",
+          touchAction: "manipulation",
         },
         style,
       )}
@@ -386,17 +410,18 @@ export function BottomTabs({
       style={{
         position: "fixed",
         left: "50%",
-        width: "min(calc(100% - 28px), 1080px)",
+        width: "min(calc(100% - 28px), 980px)",
         transform: "translateX(-50%)",
         bottom: "max(16px, env(safe-area-inset-bottom))",
         display: "grid",
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-        gap: 10,
-        padding: 10,
-        borderRadius: 28,
+        gap: 8,
+        padding: 8,
+        borderRadius: 30,
         background: "var(--nav-bg)",
-        backdropFilter: "blur(18px)",
+        backdropFilter: "blur(30px) saturate(180%)",
         border: "1px solid var(--border)",
+        boxShadow: "var(--inner-highlight), 0 18px 48px rgba(0,0,0,0.22)",
         zIndex: 30,
       }}
     >
@@ -410,16 +435,19 @@ export function BottomTabs({
             style={{
               border: "none",
               minHeight: 58,
-              borderRadius: 20,
+              borderRadius: 22,
               background: active
-                ? "color-mix(in srgb, var(--accent) 18%, transparent)"
+                ? "color-mix(in srgb, var(--accent) 18%, var(--surface-strong))"
                 : "transparent",
               color: active ? "var(--text)" : "var(--muted)",
-              fontWeight: active ? 700 : 600,
+              fontWeight: active ? 760 : 650,
               display: "grid",
               placeItems: "center",
               gap: 4,
               cursor: "pointer",
+              transition:
+                "background 160ms ease, color 160ms ease, transform 160ms ease",
+              touchAction: "manipulation",
             }}
           >
             <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>

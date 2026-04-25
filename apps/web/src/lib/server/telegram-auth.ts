@@ -38,7 +38,7 @@ const DAD_USERNAME = normalizeUsername(
   process.env.DEFAULT_DAD_USERNAME ?? "yamob",
 );
 const INIT_DATA_MAX_AGE_SECONDS = Number(
-  process.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS ?? 900,
+  process.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS ?? 60 * 60 * 24,
 );
 export const TELEGRAM_SESSION_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_SESSION_MAX_AGE_SECONDS ?? 60 * 60 * 24 * 30,
