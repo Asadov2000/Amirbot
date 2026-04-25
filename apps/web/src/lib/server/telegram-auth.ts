@@ -31,6 +31,12 @@ const MOM_TELEGRAM_ID = (
 const DAD_TELEGRAM_ID = (
   process.env.DEFAULT_DAD_TELEGRAM_ID ?? (isProduction ? "" : "5328212518")
 ).trim();
+const MOM_USERNAME = normalizeUsername(
+  process.env.DEFAULT_MOM_USERNAME ?? "manizha_u",
+);
+const DAD_USERNAME = normalizeUsername(
+  process.env.DEFAULT_DAD_USERNAME ?? "yamob",
+);
 const INIT_DATA_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS ?? 900,
 );
@@ -43,17 +49,24 @@ function normalizeUsername(value?: string): string {
 }
 
 function actorFromUser(user: TelegramInitDataUser): ActorId | null {
-  if (!MOM_TELEGRAM_ID || !DAD_TELEGRAM_ID) {
-    throw new Error("Telegram allowed user ids are not configured");
+  if (!MOM_TELEGRAM_ID && !DAD_TELEGRAM_ID && !MOM_USERNAME && !DAD_USERNAME) {
+    throw new Error("Telegram allowed users are not configured");
   }
 
   const telegramUserId = user.id ? String(user.id) : undefined;
+  const username = normalizeUsername(user.username);
 
-  if (telegramUserId && telegramUserId === DAD_TELEGRAM_ID) {
+  if (
+    (telegramUserId && telegramUserId === DAD_TELEGRAM_ID) ||
+    (username && username === DAD_USERNAME)
+  ) {
     return "dad";
   }
 
-  if (telegramUserId && telegramUserId === MOM_TELEGRAM_ID) {
+  if (
+    (telegramUserId && telegramUserId === MOM_TELEGRAM_ID) ||
+    (username && username === MOM_USERNAME)
+  ) {
     return "mom";
   }
 

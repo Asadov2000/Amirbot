@@ -1,3 +1,5 @@
+import { retrieveLaunchParams, retrieveRawInitData } from "@telegram-apps/sdk";
+
 import type { ActorId } from "./types";
 
 interface TelegramWebAppUser {
@@ -52,7 +54,16 @@ export function getTelegramInitData(): string | undefined {
     return undefined;
   }
 
-  return (window as TelegramWindow).Telegram?.WebApp?.initData || undefined;
+  const webAppInitData = (window as TelegramWindow).Telegram?.WebApp?.initData;
+  if (webAppInitData) {
+    return webAppInitData;
+  }
+
+  try {
+    return retrieveRawInitData() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function resolveTelegramActor(): ClientActorContext | null {
@@ -61,10 +72,27 @@ export function resolveTelegramActor(): ClientActorContext | null {
   }
 
   const webApp = (window as TelegramWindow).Telegram?.WebApp;
-  const user = webApp?.initDataUnsafe?.user;
+  let user = webApp?.initDataUnsafe?.user;
+  let initData = webApp?.initData || getTelegramInitData();
+
+  if (!user) {
+    try {
+      const launchParams = retrieveLaunchParams(true);
+      user = launchParams.tgWebAppData?.user
+        ? {
+            id: launchParams.tgWebAppData.user.id,
+            username: launchParams.tgWebAppData.user.username,
+            first_name: launchParams.tgWebAppData.user.firstName,
+          }
+        : undefined;
+      initData = initData || retrieveRawInitData() || undefined;
+    } catch {
+      // Fall back to the native Telegram.WebApp object below.
+    }
+  }
   const actor = actorFromUser(user);
 
-  if (!webApp || !user) {
+  if (!user && !initData) {
     return null;
   }
 
@@ -75,8 +103,8 @@ export function resolveTelegramActor(): ClientActorContext | null {
     displayName:
       actor === "dad" ? "Папа" : actor === "mom" ? "Мама" : "Проверяю доступ",
     allowed: true,
-    telegramUserId: user.id ? String(user.id) : undefined,
-    initData: webApp?.initData || undefined,
+    telegramUserId: user?.id ? String(user.id) : undefined,
+    initData,
   };
 }
 
