@@ -18,7 +18,7 @@ import {
   reminderStatuses,
   reminderTypes,
   temperatureMethods,
-  userStatuses
+  userStatuses,
 } from "./enums.js";
 
 type SchemaJsonValue =
@@ -35,7 +35,14 @@ const optionalTrimmedStringSchema = z.string().trim().max(2000).optional();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 const dateSchema = z.coerce.date();
 const jsonValueSchema: z.ZodType<SchemaJsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)])
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
 );
 
 const timeZoneSchema = z
@@ -86,7 +93,7 @@ const careEventCreateShape = {
   medicationUnit: z.string().trim().min(1).max(32).optional(),
   medicationRoute: z.enum(medicationRoutes).optional(),
   reminderId: idSchema.optional(),
-  medicationScheduleId: idSchema.optional()
+  medicationScheduleId: idSchema.optional(),
 } satisfies z.ZodRawShape;
 
 const careEventUpdateShape = {
@@ -110,7 +117,8 @@ const careEventUpdateShape = {
   medicationUnit: z.string().trim().min(1).max(32).nullish(),
   medicationRoute: z.enum(medicationRoutes).nullish(),
   reminderId: idSchema.nullish(),
-  medicationScheduleId: idSchema.nullish()
+  medicationScheduleId: idSchema.nullish(),
+  expectedRevision: z.number().int().positive().optional(),
 } satisfies z.ZodRawShape;
 
 function validateCareEventPayload(
@@ -126,23 +134,29 @@ function validateCareEventPayload(
     startedAt?: Date | null | undefined;
     endedAt?: Date | null | undefined;
   },
-  ctx: z.RefinementCtx
+  ctx: z.RefinementCtx,
 ) {
   if (value.startedAt && value.endedAt && value.startedAt > value.endedAt) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "startedAt не может быть позже endedAt",
-      path: ["startedAt"]
+      path: ["startedAt"],
     });
   }
 
   switch (value.type) {
     case "BREASTFEEDING":
-      if (!value.breastSide && !value.durationSeconds && !value.startedAt && !value.endedAt) {
+      if (
+        !value.breastSide &&
+        !value.durationSeconds &&
+        !value.startedAt &&
+        !value.endedAt
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Для грудного кормления нужно указать сторону, длительность или интервал",
-          path: ["breastSide"]
+          message:
+            "Для грудного кормления нужно указать сторону, длительность или интервал",
+          path: ["breastSide"],
         });
       }
       break;
@@ -151,7 +165,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для бутылочки нужно указать объём в мл",
-          path: ["quantityMl"]
+          path: ["quantityMl"],
         });
       }
       break;
@@ -160,7 +174,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для сна нужно указать длительность или границы интервала",
-          path: ["durationSeconds"]
+          path: ["durationSeconds"],
         });
       }
       break;
@@ -169,7 +183,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для подгузника нужно указать тип",
-          path: ["diaperKind"]
+          path: ["diaperKind"],
         });
       }
       break;
@@ -178,7 +192,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для температуры нужно указать значение",
-          path: ["temperatureC"]
+          path: ["temperatureC"],
         });
       }
       break;
@@ -187,7 +201,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для лекарства нужно указать название",
-          path: ["medicationName"]
+          path: ["medicationName"],
         });
       }
       break;
@@ -196,7 +210,7 @@ function validateCareEventPayload(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Для заметки нужен текст",
-          path: ["note"]
+          path: ["note"],
         });
       }
       break;
@@ -207,7 +221,11 @@ function validateCareEventPayload(
 
 export const userDtoSchema = z.object({
   id: idSchema,
-  telegramUserId: z.string().trim().regex(/^\d{5,20}$/).nullable(),
+  telegramUserId: z
+    .string()
+    .trim()
+    .regex(/^\d{5,20}$/)
+    .nullable(),
   firstName: nonEmptyStringSchema.max(120),
   lastName: z.string().trim().max(120).nullable(),
   displayName: nonEmptyStringSchema.max(160),
@@ -216,7 +234,7 @@ export const userDtoSchema = z.object({
   status: z.enum(userStatuses),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const familyDtoSchema = z.object({
@@ -225,7 +243,7 @@ export const familyDtoSchema = z.object({
   timeZone: timeZoneSchema,
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const familyMemberDtoSchema = z.object({
@@ -235,7 +253,7 @@ export const familyMemberDtoSchema = z.object({
   role: z.enum(familyMemberRoles),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const childDtoSchema = z.object({
@@ -246,7 +264,7 @@ export const childDtoSchema = z.object({
   sex: z.enum(childSexes),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const careEventDtoSchema = z.object({
@@ -279,7 +297,7 @@ export const careEventDtoSchema = z.object({
   revision: z.number().int().positive(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const createCareEventInputSchema = z
@@ -293,7 +311,7 @@ export const updateCareEventInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "startedAt не может быть позже endedAt",
-        path: ["startedAt"]
+        path: ["startedAt"],
       });
     }
   });
@@ -304,7 +322,7 @@ export const careEventFeedQuerySchema = z.object({
   types: z.array(careEventTypeSchema).min(1).max(7).optional(),
   includeDeleted: z.coerce.boolean().default(false),
   cursor: idSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(30)
+  limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
 export const reminderDtoSchema = z.object({
@@ -322,7 +340,7 @@ export const reminderDtoSchema = z.object({
   timeZone: timeZoneSchema,
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const createReminderInputSchema = z.object({
@@ -334,7 +352,7 @@ export const createReminderInputSchema = z.object({
   message: z.string().trim().max(1000).optional(),
   dueAt: dateSchema,
   repeatEveryMinutes: z.coerce.number().int().positive().max(10080).optional(),
-  timeZone: timeZoneSchema
+  timeZone: timeZoneSchema,
 });
 
 export const medicationScheduleDtoSchema = z.object({
@@ -354,7 +372,7 @@ export const medicationScheduleDtoSchema = z.object({
   notes: z.string().nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const dailySummaryDtoSchema = z.object({
@@ -383,14 +401,14 @@ export const dailySummaryDtoSchema = z.object({
   generatedAt: isoDateTimeSchema,
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const dailySummaryRequestSchema = z.object({
   familyId: idSchema,
   childId: idSchema,
   date: dateSchema,
-  timeZone: timeZoneSchema.optional()
+  timeZone: timeZoneSchema.optional(),
 });
 
 export const exportJobDtoSchema = z.object({
@@ -408,7 +426,7 @@ export const exportJobDtoSchema = z.object({
   errorMessage: z.string().nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export const createExportJobInputSchema = z.object({
@@ -418,7 +436,7 @@ export const createExportJobInputSchema = z.object({
   format: exportFormatSchema,
   scope: exportScopeSchema,
   rangeStart: dateSchema,
-  rangeEnd: dateSchema
+  rangeEnd: dateSchema,
 });
 
 export const auditLogDtoSchema = z.object({
@@ -433,7 +451,7 @@ export const auditLogDtoSchema = z.object({
   changes: z.record(z.string(), jsonValueSchema).nullable(),
   metadata: z.record(z.string(), jsonValueSchema).nullable(),
   createdAt: isoDateTimeSchema,
-  deletedAt: isoDateTimeSchema.nullable()
+  deletedAt: isoDateTimeSchema.nullable(),
 });
 
 export {
@@ -451,5 +469,5 @@ export {
   medicationScheduleStatusSchema,
   reminderStatusSchema,
   reminderTypeSchema,
-  timeZoneSchema
+  timeZoneSchema,
 };

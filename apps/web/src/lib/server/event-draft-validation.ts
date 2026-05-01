@@ -69,6 +69,106 @@ function validatePayload(
   }
 }
 
+function payloadNumber(payload: EventDraft["payload"], key: string) {
+  const value = payload[key];
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function validateSemanticPayload(kind: string, payload: EventDraft["payload"]) {
+  if (kind === "FEEDING") {
+    if (payload.mode === "BREAST") {
+      const durationMinutes = payloadNumber(payload, "durationMinutes");
+      if (!durationMinutes || durationMinutes < 1 || durationMinutes > 180) {
+        throw new ApiError(
+          "Breastfeeding duration is invalid",
+          400,
+          "Некорректная длительность кормления.",
+        );
+      }
+      return;
+    }
+
+    if (payload.mode === "BOTTLE") {
+      const volumeMl = payloadNumber(payload, "volumeMl");
+      if (!volumeMl || volumeMl < 1 || volumeMl > 500) {
+        throw new ApiError(
+          "Bottle volume is invalid",
+          400,
+          "Некорректный объём бутылочки.",
+        );
+      }
+      return;
+    }
+
+    throw new ApiError(
+      "Feeding mode is invalid",
+      400,
+      "Некорректный тип кормления.",
+    );
+  }
+
+  if (
+    kind === "DIAPER" &&
+    payload.type !== "WET" &&
+    payload.type !== "DIRTY" &&
+    payload.type !== "MIXED"
+  ) {
+    throw new ApiError(
+      "Diaper type is invalid",
+      400,
+      "Некорректный тип подгузника.",
+    );
+  }
+
+  if (
+    kind === "SLEEP" &&
+    payload.phase !== "START" &&
+    payload.phase !== "END"
+  ) {
+    throw new ApiError(
+      "Sleep phase is invalid",
+      400,
+      "Некорректная запись сна.",
+    );
+  }
+
+  if (kind === "TEMPERATURE") {
+    const temperatureC = payloadNumber(payload, "temperatureC");
+    if (!temperatureC || temperatureC < 32 || temperatureC > 43) {
+      throw new ApiError(
+        "Temperature is invalid",
+        400,
+        "Некорректная температура.",
+      );
+    }
+  }
+
+  if (kind === "GROWTH") {
+    const weightKg = payloadNumber(payload, "weightKg");
+    const heightCm = payloadNumber(payload, "heightCm");
+    if (
+      (weightKg !== null && (weightKg <= 0 || weightKg > 30)) ||
+      (heightCm !== null && (heightCm <= 0 || heightCm > 120)) ||
+      (weightKg === null && heightCm === null)
+    ) {
+      throw new ApiError(
+        "Growth payload is invalid",
+        400,
+        "Укажите корректный вес или рост.",
+      );
+    }
+  }
+}
+
 function validateOccurredAt(value: unknown): asserts value is string {
   if (typeof value !== "string") {
     throw new ApiError(
@@ -169,6 +269,7 @@ export function validateEventDraft(value: unknown): EventDraft {
 
   validateOccurredAt(value.occurredAt);
   validatePayload(value.payload);
+  validateSemanticPayload(value.kind, value.payload);
 
   return {
     kind: value.kind as EventDraft["kind"],

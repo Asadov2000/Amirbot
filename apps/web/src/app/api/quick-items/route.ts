@@ -21,6 +21,7 @@ export async function DELETE(request: Request) {
     const payload = await readJsonBody<{
       kind?: QuickItemKind;
       label?: string;
+      clientRequestId?: string;
     }>(request);
 
     if (payload.kind !== "SOLID_FOOD" && payload.kind !== "MEDICATION") {
@@ -35,6 +36,9 @@ export async function DELETE(request: Request) {
       payload.kind,
       payload.label ?? "",
       actor.actor,
+      typeof payload.clientRequestId === "string"
+        ? payload.clientRequestId
+        : undefined,
     );
 
     return NextResponse.json({

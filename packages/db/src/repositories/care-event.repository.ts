@@ -8,7 +8,7 @@ import {
   type CareEventType,
   type CreateCareEventInput,
   type JsonValue,
-  type UpdateCareEventInput
+  type UpdateCareEventInput,
 } from "@amir/shared";
 
 import { writeAuditLog } from "../audit.js";
@@ -37,7 +37,7 @@ function serializeCareEventSnapshot(event: CareEvent) {
     reminderId: event.reminderId ?? null,
     medicationScheduleId: event.medicationScheduleId ?? null,
     revision: event.revision,
-    deletedAt: event.deletedAt?.toISOString() ?? null
+    deletedAt: event.deletedAt?.toISOString() ?? null,
   };
 }
 
@@ -70,43 +70,66 @@ export class CareEventRepository {
         where: {
           familyId_idempotencyKey: {
             familyId: payload.familyId,
-            idempotencyKey: payload.idempotencyKey
-          }
-        }
+            idempotencyKey: payload.idempotencyKey,
+          },
+        },
       });
 
       if (existing) {
         return existing;
       }
 
-      const event = await tx.careEvent.create({
-        data: {
-          familyId: payload.familyId,
-          childId: payload.childId,
-          createdByUserId: payload.createdByUserId,
-          type: payload.type,
-          source: payload.source,
-          idempotencyKey: payload.idempotencyKey,
-          occurredAt: payload.occurredAt,
-          startedAt: payload.startedAt ?? null,
-          endedAt: payload.endedAt ?? null,
-          note: payload.note ?? null,
-          payload: toPrismaJsonValue(payload.payload),
-          breastSide: payload.breastSide ?? null,
-          feedingSource: payload.feedingSource ?? null,
-          quantityMl: payload.quantityMl ?? null,
-          durationSeconds: payload.durationSeconds ?? null,
-          diaperKind: payload.diaperKind ?? null,
-          temperatureC: payload.temperatureC ?? null,
-          temperatureMethod: payload.temperatureMethod ?? null,
-          medicationName: payload.medicationName ?? null,
-          medicationDose: payload.medicationDose ?? null,
-          medicationUnit: payload.medicationUnit ?? null,
-          medicationRoute: payload.medicationRoute ?? null,
-          reminderId: payload.reminderId ?? null,
-          medicationScheduleId: payload.medicationScheduleId ?? null
+      let event: CareEvent;
+      try {
+        event = await tx.careEvent.create({
+          data: {
+            familyId: payload.familyId,
+            childId: payload.childId,
+            createdByUserId: payload.createdByUserId,
+            type: payload.type,
+            source: payload.source,
+            idempotencyKey: payload.idempotencyKey,
+            occurredAt: payload.occurredAt,
+            startedAt: payload.startedAt ?? null,
+            endedAt: payload.endedAt ?? null,
+            note: payload.note ?? null,
+            payload: toPrismaJsonValue(payload.payload),
+            breastSide: payload.breastSide ?? null,
+            feedingSource: payload.feedingSource ?? null,
+            quantityMl: payload.quantityMl ?? null,
+            durationSeconds: payload.durationSeconds ?? null,
+            diaperKind: payload.diaperKind ?? null,
+            temperatureC: payload.temperatureC ?? null,
+            temperatureMethod: payload.temperatureMethod ?? null,
+            medicationName: payload.medicationName ?? null,
+            medicationDose: payload.medicationDose ?? null,
+            medicationUnit: payload.medicationUnit ?? null,
+            medicationRoute: payload.medicationRoute ?? null,
+            reminderId: payload.reminderId ?? null,
+            medicationScheduleId: payload.medicationScheduleId ?? null,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const racedExisting = await tx.careEvent.findUnique({
+            where: {
+              familyId_idempotencyKey: {
+                familyId: payload.familyId,
+                idempotencyKey: payload.idempotencyKey,
+              },
+            },
+          });
+
+          if (racedExisting) {
+            return racedExisting;
+          }
         }
-      });
+
+        throw error;
+      }
 
       await writeAuditLog(tx, {
         familyId: event.familyId,
@@ -116,11 +139,11 @@ export class CareEventRepository {
         entityType: "CareEvent",
         entityId: event.id,
         changes: {
-          after: serializeCareEventSnapshot(event)
+          after: serializeCareEventSnapshot(event),
         },
         metadata: {
-          idempotencyKey: event.idempotencyKey
-        }
+          idempotencyKey: event.idempotencyKey,
+        },
       });
 
       return event;
@@ -135,8 +158,8 @@ export class CareEventRepository {
         where: {
           id: payload.id,
           familyId: payload.familyId,
-          deletedAt: null
-        }
+          deletedAt: null,
+        },
       });
 
       if (!current) {
@@ -152,27 +175,42 @@ export class CareEventRepository {
         idempotencyKey: current.idempotencyKey,
         occurredAt: payload.occurredAt ?? current.occurredAt,
         startedAt:
-          payload.startedAt === undefined ? (current.startedAt ?? undefined) : (payload.startedAt ?? undefined),
+          payload.startedAt === undefined
+            ? (current.startedAt ?? undefined)
+            : (payload.startedAt ?? undefined),
         endedAt:
-          payload.endedAt === undefined ? (current.endedAt ?? undefined) : (payload.endedAt ?? undefined),
-        note: payload.note === undefined ? (current.note ?? undefined) : (payload.note ?? undefined),
+          payload.endedAt === undefined
+            ? (current.endedAt ?? undefined)
+            : (payload.endedAt ?? undefined),
+        note:
+          payload.note === undefined
+            ? (current.note ?? undefined)
+            : (payload.note ?? undefined),
         payload:
           payload.payload === undefined
-            ? ((current.payload as Record<string, JsonValue> | null) ?? undefined)
+            ? ((current.payload as Record<string, JsonValue> | null) ??
+              undefined)
             : (payload.payload ?? undefined),
         breastSide:
-          payload.breastSide === undefined ? (current.breastSide ?? undefined) : (payload.breastSide ?? undefined),
+          payload.breastSide === undefined
+            ? (current.breastSide ?? undefined)
+            : (payload.breastSide ?? undefined),
         feedingSource:
           payload.feedingSource === undefined
             ? (current.feedingSource ?? undefined)
             : (payload.feedingSource ?? undefined),
-        quantityMl: payload.quantityMl === undefined ? (current.quantityMl ?? undefined) : (payload.quantityMl ?? undefined),
+        quantityMl:
+          payload.quantityMl === undefined
+            ? (current.quantityMl ?? undefined)
+            : (payload.quantityMl ?? undefined),
         durationSeconds:
           payload.durationSeconds === undefined
             ? (current.durationSeconds ?? undefined)
             : (payload.durationSeconds ?? undefined),
         diaperKind:
-          payload.diaperKind === undefined ? (current.diaperKind ?? undefined) : (payload.diaperKind ?? undefined),
+          payload.diaperKind === undefined
+            ? (current.diaperKind ?? undefined)
+            : (payload.diaperKind ?? undefined),
         temperatureC:
           payload.temperatureC === undefined
             ? (decimalToNumber(current.temperatureC) ?? undefined)
@@ -198,16 +236,23 @@ export class CareEventRepository {
             ? (current.medicationRoute ?? undefined)
             : (payload.medicationRoute ?? undefined),
         reminderId:
-          payload.reminderId === undefined ? (current.reminderId ?? undefined) : (payload.reminderId ?? undefined),
+          payload.reminderId === undefined
+            ? (current.reminderId ?? undefined)
+            : (payload.reminderId ?? undefined),
         medicationScheduleId:
           payload.medicationScheduleId === undefined
             ? (current.medicationScheduleId ?? undefined)
-            : (payload.medicationScheduleId ?? undefined)
+            : (payload.medicationScheduleId ?? undefined),
       });
 
-      const updated = await tx.careEvent.update({
+      const updateResult = await tx.careEvent.updateMany({
         where: {
-          id: current.id
+          id: current.id,
+          familyId: payload.familyId,
+          deletedAt: null,
+          ...(payload.expectedRevision
+            ? { revision: payload.expectedRevision }
+            : {}),
         },
         data: {
           occurredAt: merged.occurredAt,
@@ -230,9 +275,20 @@ export class CareEventRepository {
           medicationScheduleId: merged.medicationScheduleId ?? null,
           updatedByUserId: payload.updatedByUserId,
           revision: {
-            increment: 1
-          }
-        }
+            increment: 1,
+          },
+        },
+      });
+
+      if (updateResult.count !== 1) {
+        throw new Error("Revision conflict");
+      }
+
+      const updated = await tx.careEvent.findFirstOrThrow({
+        where: {
+          id: current.id,
+          familyId: payload.familyId,
+        },
       });
 
       await writeAuditLog(tx, {
@@ -244,8 +300,8 @@ export class CareEventRepository {
         entityId: updated.id,
         changes: {
           before: serializeCareEventSnapshot(current),
-          after: serializeCareEventSnapshot(updated)
-        }
+          after: serializeCareEventSnapshot(updated),
+        },
       });
 
       return updated;
@@ -258,8 +314,8 @@ export class CareEventRepository {
         where: {
           id: input.id,
           familyId: input.familyId,
-          deletedAt: null
-        }
+          deletedAt: null,
+        },
       });
 
       if (!current) {
@@ -271,8 +327,8 @@ export class CareEventRepository {
         where: { id: current.id },
         data: {
           deletedAt,
-          updatedByUserId: input.deletedByUserId
-        }
+          updatedByUserId: input.deletedByUserId,
+        },
       });
 
       await writeAuditLog(tx, {
@@ -284,11 +340,11 @@ export class CareEventRepository {
         entityId: deleted.id,
         changes: {
           before: serializeCareEventSnapshot(current),
-          after: serializeCareEventSnapshot(deleted)
+          after: serializeCareEventSnapshot(deleted),
         },
         metadata: omitUndefined({
-          reason: input.reason ?? undefined
-        })
+          reason: input.reason ?? undefined,
+        }),
       });
 
       return deleted;
@@ -303,8 +359,8 @@ export class CareEventRepository {
       const cursorEvent = await this.db.careEvent.findFirst({
         where: {
           id: payload.cursor,
-          familyId: payload.familyId
-        }
+          familyId: payload.familyId,
+        },
       });
 
       if (cursorEvent) {
@@ -312,23 +368,23 @@ export class CareEventRepository {
           OR: [
             {
               occurredAt: {
-                lt: cursorEvent.occurredAt
-              }
+                lt: cursorEvent.occurredAt,
+              },
             },
             {
               occurredAt: cursorEvent.occurredAt,
               createdAt: {
-                lt: cursorEvent.createdAt
-              }
+                lt: cursorEvent.createdAt,
+              },
             },
             {
               occurredAt: cursorEvent.occurredAt,
               createdAt: cursorEvent.createdAt,
               id: {
-                lt: cursorEvent.id
-              }
-            }
-          ]
+                lt: cursorEvent.id,
+              },
+            },
+          ],
         };
       }
     }
@@ -339,10 +395,10 @@ export class CareEventRepository {
         childId: payload.childId,
         type: payload.types ? { in: payload.types } : undefined,
         deletedAt: payload.includeDeleted ? undefined : null,
-        ...cursorFilter
+        ...cursorFilter,
       },
       orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-      take: payload.limit + 1
+      take: payload.limit + 1,
     });
 
     const hasMore = items.length > payload.limit;
@@ -350,7 +406,7 @@ export class CareEventRepository {
 
     return {
       items: pageItems,
-      nextCursor: hasMore ? pageItems.at(-1)?.id ?? null : null
+      nextCursor: hasMore ? (pageItems.at(-1)?.id ?? null) : null,
     };
   }
 
@@ -360,11 +416,11 @@ export class CareEventRepository {
         familyId: query.familyId,
         childId: query.childId,
         type: {
-          in: query.types
+          in: query.types,
         },
-        deletedAt: null
+        deletedAt: null,
       },
-      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }]
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
     });
   }
 }

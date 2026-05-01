@@ -146,24 +146,24 @@ enum AuditActorType {
 }
 
 model User {
-  id                    String        @id @default(cuid())
-  telegramUserId        String?       @unique
-  firstName             String
-  lastName              String?
-  displayName           String
-  locale                String        @default("ru-RU")
-  timeZone              String        @default("Europe/Moscow")
-  status                UserStatus    @default(ACTIVE)
-  memberships           FamilyMember[]
-  createdCareEvents     CareEvent[]   @relation("CareEventsCreated")
-  updatedCareEvents     CareEvent[]   @relation("CareEventsUpdated")
-  remindersCreated      Reminder[]    @relation("RemindersCreated")
-  medicationSchedules   MedicationSchedule[] @relation("MedicationSchedulesCreated")
-  exportJobsRequested   ExportJob[]   @relation("ExportJobsRequested")
-  auditLogsActed        AuditLog[]    @relation("AuditLogsActor")
-  createdAt             DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt             DateTime      @updatedAt @db.Timestamptz(3)
-  deletedAt             DateTime?     @db.Timestamptz(3)
+  id                  String               @id @default(cuid())
+  telegramUserId      String?              @unique
+  firstName           String
+  lastName            String?
+  displayName         String
+  locale              String               @default("ru-RU")
+  timeZone            String               @default("Europe/Moscow")
+  status              UserStatus           @default(ACTIVE)
+  memberships         FamilyMember[]
+  createdCareEvents   CareEvent[]          @relation("CareEventsCreated")
+  updatedCareEvents   CareEvent[]          @relation("CareEventsUpdated")
+  remindersCreated    Reminder[]           @relation("RemindersCreated")
+  medicationSchedules MedicationSchedule[] @relation("MedicationSchedulesCreated")
+  exportJobsRequested ExportJob[]          @relation("ExportJobsRequested")
+  auditLogsActed      AuditLog[]           @relation("AuditLogsActor")
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  deletedAt           DateTime?            @db.Timestamptz(3)
 
   @@index([deletedAt])
   @@map("users")
@@ -228,17 +228,17 @@ model Child {
 }
 
 model CareEvent {
-  id                   String            @id @default(cuid())
+  id                   String              @id @default(cuid())
   familyId             String
   childId              String
   createdByUserId      String
   updatedByUserId      String?
   type                 CareEventType
-  source               CareEventSource   @default(MANUAL)
+  source               CareEventSource     @default(MANUAL)
   idempotencyKey       String
-  occurredAt           DateTime          @db.Timestamptz(3)
-  startedAt            DateTime?         @db.Timestamptz(3)
-  endedAt              DateTime?         @db.Timestamptz(3)
+  occurredAt           DateTime            @db.Timestamptz(3)
+  startedAt            DateTime?           @db.Timestamptz(3)
+  endedAt              DateTime?           @db.Timestamptz(3)
   note                 String?
   payload              Json?
   breastSide           BreastSide?
@@ -246,24 +246,24 @@ model CareEvent {
   quantityMl           Int?
   durationSeconds      Int?
   diaperKind           DiaperKind?
-  temperatureC         Decimal?          @db.Decimal(4, 1)
+  temperatureC         Decimal?            @db.Decimal(4, 1)
   temperatureMethod    TemperatureMethod?
   medicationName       String?
-  medicationDose       Decimal?          @db.Decimal(10, 2)
+  medicationDose       Decimal?            @db.Decimal(10, 2)
   medicationUnit       String?
   medicationRoute      MedicationRoute?
   reminderId           String?
   medicationScheduleId String?
-  revision             Int               @default(1)
-  family               Family            @relation(fields: [familyId], references: [id])
-  child                Child             @relation(fields: [childId], references: [id])
-  createdBy            User              @relation("CareEventsCreated", fields: [createdByUserId], references: [id])
-  updatedBy            User?             @relation("CareEventsUpdated", fields: [updatedByUserId], references: [id])
-  reminder             Reminder?         @relation(fields: [reminderId], references: [id])
+  revision             Int                 @default(1)
+  family               Family              @relation(fields: [familyId], references: [id])
+  child                Child               @relation(fields: [childId], references: [id])
+  createdBy            User                @relation("CareEventsCreated", fields: [createdByUserId], references: [id])
+  updatedBy            User?               @relation("CareEventsUpdated", fields: [updatedByUserId], references: [id])
+  reminder             Reminder?           @relation(fields: [reminderId], references: [id])
   medicationSchedule   MedicationSchedule? @relation(fields: [medicationScheduleId], references: [id])
-  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
-  deletedAt            DateTime?         @db.Timestamptz(3)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(3)
+  deletedAt            DateTime?           @db.Timestamptz(3)
 
   @@unique([familyId, idempotencyKey])
   @@index([familyId, childId, occurredAt])
@@ -393,21 +393,21 @@ model ExportJob {
 }
 
 model AuditLog {
-  id         String         @id @default(cuid())
-  familyId   String?
-  childId    String?
+  id          String         @id @default(cuid())
+  familyId    String?
+  childId     String?
   actorUserId String?
-  actorType  AuditActorType @default(USER)
-  action     AuditAction
-  entityType String
-  entityId   String
-  changes    Json?
-  metadata   Json?
-  family     Family?        @relation(fields: [familyId], references: [id])
-  child      Child?         @relation(fields: [childId], references: [id])
-  actorUser  User?          @relation("AuditLogsActor", fields: [actorUserId], references: [id])
-  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
-  deletedAt  DateTime?      @db.Timestamptz(3)
+  actorType   AuditActorType @default(USER)
+  action      AuditAction
+  entityType  String
+  entityId    String
+  changes     Json?
+  metadata    Json?
+  family      Family?        @relation(fields: [familyId], references: [id])
+  child       Child?         @relation(fields: [childId], references: [id])
+  actorUser   User?          @relation("AuditLogsActor", fields: [actorUserId], references: [id])
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  deletedAt   DateTime?      @db.Timestamptz(3)
 
   @@index([familyId, createdAt])
   @@index([childId, createdAt])

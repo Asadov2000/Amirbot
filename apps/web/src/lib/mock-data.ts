@@ -335,11 +335,33 @@ export function buildSnapshotFromEvents(
   },
   quickItems: QuickItemRecord[] = quickItemsFromRecords(events),
 ): DashboardSnapshot {
-  const sortedEvents = [...events].sort(
-    (left, right) =>
+  const sortedEvents = [...events].sort((left, right) => {
+    const occurredDiff =
       new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime(),
-  );
+      new Date(left.occurredAt).getTime();
+    if (occurredDiff !== 0) {
+      return occurredDiff;
+    }
+
+    const changedDiff =
+      new Date(
+        right.updatedAt ?? right.editedAt ?? right.createdAt ?? 0,
+      ).getTime() -
+      new Date(
+        left.updatedAt ?? left.editedAt ?? left.createdAt ?? 0,
+      ).getTime();
+    if (changedDiff !== 0) {
+      return changedDiff;
+    }
+
+    return right.id.localeCompare(left.id);
+  });
+  const snapshotVersion = sortedEvents
+    .map((event) => event.updatedAt ?? event.editedAt ?? event.createdAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const generatedAt = new Date().toISOString();
 
   const lastFeed = sortedEvents.find((event) => event.kind === "FEEDING");
   const lastSleepStart = sortedEvents.find(
@@ -369,7 +391,10 @@ export function buildSnapshotFromEvents(
     : undefined;
 
   const snapshot: DashboardSnapshot = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
+    snapshotVersion,
+    syncVersion: snapshotVersion ?? generatedAt,
+    lastSyncedAt: snapshotVersion ?? generatedAt,
     child: {
       id: child.id,
       name: child.name,
@@ -480,11 +505,18 @@ export function mergeSnapshot(
   );
   localQuickItems.forEach((item) => quickItems.set(item.key, item));
 
-  return buildSnapshotFromEvents(
+  const mergedSnapshot = buildSnapshotFromEvents(
     Array.from(deduped.values()),
     snapshot.child,
     Array.from(quickItems.values()),
   );
+
+  return {
+    ...mergedSnapshot,
+    snapshotVersion: snapshot.snapshotVersion ?? mergedSnapshot.snapshotVersion,
+    syncVersion: snapshot.syncVersion ?? mergedSnapshot.syncVersion,
+    lastSyncedAt: snapshot.lastSyncedAt ?? mergedSnapshot.lastSyncedAt,
+  };
 }
 
 export function upsertSnapshotEvent(
@@ -505,9 +537,16 @@ export function upsertSnapshotEvent(
     quickItems.set(item.key, item),
   );
 
-  return buildSnapshotFromEvents(
+  const nextSnapshot = buildSnapshotFromEvents(
     [event, ...events],
     snapshot.child,
     Array.from(quickItems.values()),
   );
+
+  return {
+    ...nextSnapshot,
+    snapshotVersion: snapshot.snapshotVersion ?? nextSnapshot.snapshotVersion,
+    syncVersion: snapshot.syncVersion ?? nextSnapshot.syncVersion,
+    lastSyncedAt: snapshot.lastSyncedAt ?? nextSnapshot.lastSyncedAt,
+  };
 }

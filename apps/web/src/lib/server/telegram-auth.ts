@@ -26,17 +26,11 @@ export const TELEGRAM_SESSION_COOKIE = "amir_session";
 const isProduction =
   process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 const MOM_TELEGRAM_ID = (
-  process.env.DEFAULT_MOM_TELEGRAM_ID ?? (isProduction ? "" : "775978948")
+  process.env.DEFAULT_MOM_TELEGRAM_ID ?? "775978948"
 ).trim();
 const DAD_TELEGRAM_ID = (
-  process.env.DEFAULT_DAD_TELEGRAM_ID ?? (isProduction ? "" : "5328212518")
+  process.env.DEFAULT_DAD_TELEGRAM_ID ?? "5328212518"
 ).trim();
-const MOM_USERNAME = normalizeUsername(
-  process.env.DEFAULT_MOM_USERNAME ?? "manizha_u",
-);
-const DAD_USERNAME = normalizeUsername(
-  process.env.DEFAULT_DAD_USERNAME ?? "yamob",
-);
 const INIT_DATA_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS ?? 60 * 60 * 24,
 );
@@ -49,24 +43,17 @@ function normalizeUsername(value?: string): string {
 }
 
 function actorFromUser(user: TelegramInitDataUser): ActorId | null {
-  if (!MOM_TELEGRAM_ID && !DAD_TELEGRAM_ID && !MOM_USERNAME && !DAD_USERNAME) {
+  if (!MOM_TELEGRAM_ID || !DAD_TELEGRAM_ID) {
     throw new Error("Telegram allowed users are not configured");
   }
 
   const telegramUserId = user.id ? String(user.id) : undefined;
-  const username = normalizeUsername(user.username);
 
-  if (
-    (telegramUserId && telegramUserId === DAD_TELEGRAM_ID) ||
-    (username && username === DAD_USERNAME)
-  ) {
+  if (telegramUserId === DAD_TELEGRAM_ID) {
     return "dad";
   }
 
-  if (
-    (telegramUserId && telegramUserId === MOM_TELEGRAM_ID) ||
-    (username && username === MOM_USERNAME)
-  ) {
+  if (telegramUserId === MOM_TELEGRAM_ID) {
     return "mom";
   }
 
@@ -257,7 +244,7 @@ export function shouldUseSecureSessionCookie() {
 }
 
 function actorFromLocalFallback(request: Request): RequestActor | null {
-  if (isProduction) {
+  if (isProduction || !isLocalAuthFallbackEnabled(request)) {
     return null;
   }
 
@@ -267,7 +254,23 @@ function actorFromLocalFallback(request: Request): RequestActor | null {
     return { actor };
   }
 
-  return { actor: "mom" };
+  return null;
+}
+
+function isLocalAuthFallbackEnabled(request: Request) {
+  if (process.env.ENABLE_LOCAL_AUTH_FALLBACK === "true") {
+    return true;
+  }
+
+  if (process.env.NEXT_PUBLIC_ENABLE_MOCK_TELEGRAM !== "true") {
+    return false;
+  }
+
+  const hostHeader = request.headers.get("host")?.toLowerCase() ?? "";
+  const host = hostHeader.startsWith("[::1]")
+    ? "[::1]"
+    : hostHeader.split(":")[0];
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
 }
 
 export function resolveRequestActor(request: Request): RequestActor {

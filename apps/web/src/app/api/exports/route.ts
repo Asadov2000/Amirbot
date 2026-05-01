@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { prisma, writeAuditLog } from "@amir/db";
+
 import { getDashboardSnapshot } from "@/lib/server/dashboard";
-import { safeApiError } from "@/lib/server/api-security";
+import { ApiError, safeApiError } from "@/lib/server/api-security";
+import { ensureDefaultFamilyContext } from "@/lib/server/family-context";
 import { assertRateLimit } from "@/lib/server/rate-limit";
 import {
   createSummaryCsv,
@@ -22,6 +25,13 @@ export async function GET(request: Request) {
     const snapshot = await getDashboardSnapshot();
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format");
+    if (format !== "pdf" && format !== "csv") {
+      throw new ApiError(
+        "Export format is invalid",
+        400,
+        "Некорректный формат экспорта.",
+      );
+    }
     const filters = {
       period: searchParams.get("period"),
       kind: searchParams.get("kind"),
@@ -29,6 +39,19 @@ export async function GET(request: Request) {
     };
     const exportSnapshot = filterSnapshotForExport(snapshot, filters);
     const filterLabel = describeExportFilters(filters);
+    const context = await ensureDefaultFamilyContext();
+    await writeAuditLog(prisma, {
+      familyId: context.familyId,
+      childId: context.childId,
+      actorUserId: context.actors[actor.actor].userId,
+      action: "GENERATE",
+      entityType: "Export",
+      entityId: `${format ?? "pdf"}:${Date.now()}`,
+      metadata: {
+        format,
+        filters,
+      },
+    });
 
     if (format === "csv") {
       return new NextResponse(createSummaryCsv(exportSnapshot, filterLabel), {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { CareEventRepository, prisma } from "@amir/db";
+import { CareEventRepository, prisma, withDbRetry } from "@amir/db";
 
 import { ApiError } from "./api-security";
 import {
@@ -654,6 +654,7 @@ function toUpdateInput(
     id,
     familyId: context.familyId,
     updatedByUserId: context.actors[updatedByActor].userId,
+    expectedRevision: draft.expectedRevision,
     occurredAt: createInput.occurredAt,
     startedAt: createInput.startedAt ?? null,
     endedAt: createInput.endedAt ?? null,
@@ -687,29 +688,81 @@ function logServerFallback(message: string, error: unknown) {
   );
 }
 
+function retryDashboardDb<T>(
+  operationName: string,
+  operation: () => Promise<T>,
+) {
+  return withDbRetry(operation, {
+    onRetry: (error, attempt) => {
+      console.warn(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          app: "@amir/web",
+          message: "Retrying database operation",
+          operationName,
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    },
+  });
+}
+
+function buildEventsSyncState(events: Array<{ id: string; updatedAt: Date }>) {
+  const maxUpdatedAt = events
+    .map((event) => event.updatedAt.toISOString())
+    .sort()
+    .at(-1);
+  const maxId =
+    events
+      .map((event) => event.id)
+      .sort()
+      .at(-1) ?? "";
+  const syncVersion = maxUpdatedAt
+    ? `${maxUpdatedAt}#${String(events.length).padStart(12, "0")}#${maxId}`
+    : "empty";
+
+  return {
+    syncVersion,
+    lastSyncedAt: maxUpdatedAt ?? new Date().toISOString(),
+  };
+}
+
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   try {
-    const context = await ensureDefaultFamilyContext();
-    const events = await prisma.careEvent.findMany({
-      where: {
-        familyId: context.familyId,
-        childId: context.childId,
-        deletedAt: null,
-      },
-      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
-    });
+    return await retryDashboardDb("dashboard snapshot", async () => {
+      const context = await ensureDefaultFamilyContext();
+      const events = await prisma.careEvent.findMany({
+        where: {
+          familyId: context.familyId,
+          childId: context.childId,
+          deletedAt: null,
+        },
+        orderBy: [
+          { occurredAt: "desc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+      });
 
-    return buildSnapshotFromEvents(
-      events
-        .map((event) => toDashboardEventRecord(event, context))
-        .filter((event): event is CareEventRecord => Boolean(event)),
-      {
-        id: context.childId,
-        name: context.childName,
-        birthDate: context.childBirthDate,
-      },
-      deriveQuickItemsFromEvents(events),
-    );
+      const snapshot = buildSnapshotFromEvents(
+        events
+          .map((event) => toDashboardEventRecord(event, context))
+          .filter((event): event is CareEventRecord => Boolean(event)),
+        {
+          id: context.childId,
+          name: context.childName,
+          birthDate: context.childBirthDate,
+        },
+        deriveQuickItemsFromEvents(events),
+      );
+      const syncState = buildEventsSyncState(events);
+      snapshot.snapshotVersion = syncState.syncVersion;
+      snapshot.syncVersion = syncState.syncVersion;
+      snapshot.lastSyncedAt = syncState.lastSyncedAt;
+      return snapshot;
+    });
   } catch (error) {
     logServerFallback("Falling back to mock dashboard snapshot", error);
     if (isProduction) {
@@ -719,10 +772,49 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   }
 }
 
+export async function getDashboardSyncState() {
+  try {
+    return await retryDashboardDb("sync state", async () => {
+      const context = await ensureDefaultFamilyContext();
+      const events = await prisma.careEvent.findMany({
+        where: {
+          familyId: context.familyId,
+          childId: context.childId,
+        },
+        select: {
+          id: true,
+          updatedAt: true,
+        },
+      });
+      const syncState = buildEventsSyncState(events);
+
+      return {
+        ok: true,
+        syncVersion: syncState.syncVersion,
+        lastSyncedAt: syncState.lastSyncedAt,
+        generatedAt: new Date().toISOString(),
+      };
+    });
+  } catch (error) {
+    logServerFallback("Falling back to mock dashboard sync state", error);
+    if (isProduction) {
+      throw error;
+    }
+
+    return {
+      ok: true,
+      syncVersion: "offline",
+      lastSyncedAt: new Date().toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+}
+
 export async function deleteDashboardQuickItem(
   kind: QuickItemKind,
   label: string,
   actor: ActorId,
+  clientRequestId?: string,
 ) {
   if (!isQuickItemKind(kind)) {
     throw new Error("Unsupported quick item kind");
@@ -733,38 +825,43 @@ export async function deleteDashboardQuickItem(
     throw new Error("Quick item label is required");
   }
 
-  const context = await ensureDefaultFamilyContext();
   const key = buildQuickItemKey(kind, normalizedLabel);
-  const occurredAt = new Date();
-  const payload = {
-    dashboardKind: "QUICK_ITEM_DELETE",
-    quickKind: kind,
-    key,
-    label: normalizedLabel,
-  };
-  const draft: EventDraft = {
-    kind: "NOTE",
-    actor,
-    occurredAt: occurredAt.toISOString(),
-    summary: `Удалена быстрая кнопка — ${normalizedLabel}`,
-    payload,
-    status: "LOGGED",
-  };
+  await retryDashboardDb("quick item delete", async () => {
+    const context = await ensureDefaultFamilyContext();
+    const occurredAt = new Date();
+    const payload = {
+      dashboardKind: "QUICK_ITEM_DELETE",
+      quickKind: kind,
+      key,
+      label: normalizedLabel,
+      ...(clientRequestId ? { clientRequestId } : {}),
+    };
+    const draft: EventDraft = {
+      kind: "NOTE",
+      actor,
+      occurredAt: occurredAt.toISOString(),
+      summary: `Удалена быстрая кнопка — ${normalizedLabel}`,
+      payload,
+      status: "LOGGED",
+    };
 
-  await careEventRepository.create({
-    familyId: context.familyId,
-    childId: context.childId,
-    createdByUserId: context.actors[actor].userId,
-    source: "MANUAL",
-    idempotencyKey: buildIdempotencyKey(
-      context,
-      draft,
-      `quick-delete:${key}:${occurredAt.getTime()}`,
-    ),
-    occurredAt,
-    payload,
-    type: "NOTE",
-    note: draft.summary,
+    await careEventRepository.create({
+      familyId: context.familyId,
+      childId: context.childId,
+      createdByUserId: context.actors[actor].userId,
+      source: "MANUAL",
+      idempotencyKey: buildIdempotencyKey(
+        context,
+        draft,
+        clientRequestId
+          ? `quick-delete:${context.familyId}:${context.childId}:${clientRequestId}`
+          : `quick-delete:${context.familyId}:${context.childId}:${actor}:${key}`,
+      ),
+      occurredAt,
+      payload,
+      type: "NOTE",
+      note: draft.summary,
+    });
   });
 
   return { key };
@@ -777,15 +874,17 @@ export async function createDashboardEvent(
   assertActorCanCreateDraft(draft, actor);
 
   try {
-    const context = await ensureDefaultFamilyContext();
-    const created = await careEventRepository.create(
-      toCreateInput(draft, context, actor),
-    );
-    const record = toDashboardEventRecord(created, context);
-    if (!record) {
-      throw new Error("Created event is not visible in dashboard");
-    }
-    return record;
+    return await retryDashboardDb("event creation", async () => {
+      const context = await ensureDefaultFamilyContext();
+      const created = await careEventRepository.create(
+        toCreateInput(draft, context, actor),
+      );
+      const record = toDashboardEventRecord(created, context);
+      if (!record) {
+        throw new Error("Created event is not visible in dashboard");
+      }
+      return record;
+    });
   } catch (error) {
     logServerFallback("Falling back to mock event creation", error);
     if (isProduction || !allowMockWriteFallback) {
@@ -834,19 +933,11 @@ export async function updateDashboardEvent(
     const typeChanged = current.type !== nextCreateInput.type;
 
     if (typeChanged) {
-      await careEventRepository.softDelete({
-        id: current.id,
-        familyId: context.familyId,
-        deletedByUserId: context.actors[updatedByActor].userId,
-        reason: "type-changed",
-      });
-
-      const recreated = await careEventRepository.create(nextCreateInput);
-      const record = toDashboardEventRecord(recreated, context);
-      if (!record) {
-        throw new Error("Updated event is not visible in dashboard");
-      }
-      return record;
+      throw new ApiError(
+        "CareEvent type change is not supported",
+        400,
+        "Тип записи менять нельзя. Создайте новую запись нужного типа.",
+      );
     }
 
     const updated = await careEventRepository.update(
@@ -863,6 +954,14 @@ export async function updateDashboardEvent(
     }
     return record;
   } catch (error) {
+    if (error instanceof Error && error.message === "Revision conflict") {
+      throw new ApiError(
+        "Revision conflict",
+        409,
+        "Запись уже изменилась на другом устройстве. Лента обновлена, проверьте актуальные данные.",
+      );
+    }
+
     logServerFallback("Falling back to mock event update", error);
     if (isProduction || !allowMockWriteFallback) {
       throw error;

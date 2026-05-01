@@ -48,11 +48,16 @@ export async function PUT(request: Request) {
       throw new ApiError("Event id is invalid", 400, "Некорректная запись.");
     }
 
-    const event = await updateDashboardEvent(
-      payload.id,
-      validateEventDraft(payload.draft),
-      actor.actor,
-    );
+    const draft = validateEventDraft(payload.draft);
+    if (!draft.expectedRevision) {
+      throw new ApiError(
+        "Event expectedRevision is required",
+        409,
+        "Запись нужно обновить перед исправлением. Лента обновлена, повторите правку.",
+      );
+    }
+
+    const event = await updateDashboardEvent(payload.id, draft, actor.actor);
 
     return NextResponse.json({
       ok: true,

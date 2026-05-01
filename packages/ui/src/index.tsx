@@ -8,18 +8,23 @@ import type {
 
 const styles = {
   card: {
-    border: "1px solid var(--border)",
-    borderRadius: 30,
+    position: "relative",
+    overflow: "hidden",
+    isolation: "isolate",
+    border: "1px solid color-mix(in srgb, var(--border) 86%, transparent)",
+    borderRadius: 34,
     background: "var(--card-bg)",
-    boxShadow: "var(--inner-highlight), var(--shadow)",
-    backdropFilter: "blur(30px) saturate(180%)",
+    boxShadow:
+      "var(--inner-highlight), 0 28px 90px rgba(0,0,0,0.28), var(--shadow)",
+    backdropFilter: "blur(34px) saturate(190%)",
   } satisfies CSSProperties,
   surface: {
-    borderRadius: 24,
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
+    borderRadius: 28,
+    background:
+      "linear-gradient(145deg, color-mix(in srgb, var(--surface-strong) 62%, transparent), color-mix(in srgb, var(--surface) 94%, transparent))",
+    border: "1px solid color-mix(in srgb, var(--border) 86%, transparent)",
     boxShadow: "var(--inner-highlight)",
-    backdropFilter: "blur(22px) saturate(160%)",
+    backdropFilter: "blur(24px) saturate(170%)",
   } satisfies CSSProperties,
   pill: {
     borderRadius: 999,
@@ -90,19 +95,21 @@ export function SectionTitle({
         display: "flex",
         alignItems: "end",
         justifyContent: "space-between",
+        flexWrap: "wrap",
         gap: 12,
-        marginBottom: 14,
+        marginBottom: 16,
       }}
     >
       <div>
         {eyebrow ? (
           <div
             style={{
-              fontSize: 12,
-              letterSpacing: "0.1em",
+              fontSize: 11,
+              letterSpacing: "0.13em",
               textTransform: "uppercase",
               color: "var(--muted)",
-              fontWeight: 700,
+              fontWeight: 780,
+              marginBottom: 6,
             }}
           >
             {eyebrow}
@@ -111,10 +118,10 @@ export function SectionTitle({
         <h2
           style={{
             margin: 0,
-            fontSize: 24,
+            fontSize: "clamp(1.45rem, 4vw, 1.85rem)",
             lineHeight: 1.06,
-            letterSpacing: "-0.035em",
-            fontWeight: 820,
+            letterSpacing: "-0.05em",
+            fontWeight: 860,
           }}
         >
           {title}
@@ -139,21 +146,40 @@ export function StatTile({
   return (
     <Surface
       style={{
+        position: "relative",
+        overflow: "hidden",
         padding: 18,
-        minHeight: 126,
+        minHeight: 136,
         display: "grid",
         alignContent: "space-between",
         gap: 12,
-        background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 13%, var(--surface-strong)), var(--surface))`,
+        borderColor: `color-mix(in srgb, ${accent} 20%, var(--border))`,
+        background: `radial-gradient(circle at 18% 0%, color-mix(in srgb, ${accent} 24%, transparent), transparent 42%), linear-gradient(180deg, color-mix(in srgb, ${accent} 9%, var(--surface-strong)), var(--surface))`,
+        boxShadow: "var(--inner-highlight), 0 16px 38px rgba(0,0,0,0.11)",
       }}
     >
-      <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
       <div
         style={{
-          fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
-          fontWeight: 820,
+          display: "inline-flex",
+          width: "fit-content",
+          maxWidth: "100%",
+          borderRadius: 999,
+          padding: "7px 10px",
+          background: `color-mix(in srgb, ${accent} 12%, var(--surface))`,
+          color: "var(--muted-strong)",
+          fontSize: 12,
+          fontWeight: 760,
+          letterSpacing: "0.01em",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "clamp(1.55rem, 4.2vw, 2.35rem)",
+          fontWeight: 880,
           lineHeight: 1,
-          letterSpacing: "-0.04em",
+          letterSpacing: "-0.055em",
         }}
       >
         {value}
@@ -187,19 +213,22 @@ export function ActionButton({
         styles.surface,
         {
           width: "100%",
-          minHeight: 94,
+          minHeight: 116,
           padding: 18,
           display: "grid",
-          gap: 8,
+          gridTemplateRows: "auto 1fr",
+          gap: 14,
           alignContent: "space-between",
           textAlign: "left",
           color: "inherit",
           cursor: "pointer",
           background: selected
             ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 24%, var(--surface-strong)), color-mix(in srgb, var(--accent-2) 12%, var(--surface)))"
-            : "linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 72%, transparent))",
+            : "radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%), linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 72%, transparent))",
           transform: selected ? "translateY(-1px)" : "none",
-          boxShadow: "var(--inner-highlight), 0 10px 22px rgba(0,0,0,0.08)",
+          boxShadow: selected
+            ? "var(--inner-highlight), 0 18px 38px color-mix(in srgb, var(--accent) 18%, transparent)"
+            : "var(--inner-highlight), 0 12px 28px rgba(0,0,0,0.08)",
           transition:
             "transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
           touchAction: "manipulation",
@@ -210,14 +239,31 @@ export function ActionButton({
       <div
         style={{ display: "flex", justifyContent: "space-between", gap: 12 }}
       >
-        <span style={{ fontSize: 26, lineHeight: 1 }}>{icon}</span>
+        <span
+          style={{
+            display: "grid",
+            placeItems: "center",
+            width: 48,
+            height: 48,
+            borderRadius: 18,
+            background:
+              "linear-gradient(145deg, color-mix(in srgb, var(--accent) 18%, var(--surface-strong)), color-mix(in srgb, var(--surface) 86%, transparent))",
+            boxShadow: "var(--inner-highlight), 0 14px 24px rgba(0,0,0,0.11)",
+            fontSize: 25,
+            lineHeight: 1,
+          }}
+        >
+          {icon}
+        </span>
         <span
           style={{
             ...styles.pill,
-            padding: "6px 10px",
-            fontSize: 12,
-            color: "var(--muted)",
-            fontWeight: 650,
+            alignSelf: "start",
+            padding: "7px 10px",
+            fontSize: 11,
+            color: selected ? "var(--text)" : "var(--muted)",
+            fontWeight: 760,
+            letterSpacing: "0.02em",
           }}
         >
           {selected ? "Выбрано" : "Быстро"}
@@ -225,13 +271,18 @@ export function ActionButton({
       </div>
       <div>
         <div
-          style={{ fontSize: 18, fontWeight: 760, letterSpacing: "-0.01em" }}
+          style={{ fontSize: 19, fontWeight: 840, letterSpacing: "-0.025em" }}
         >
           {title}
         </div>
         {subtitle ? (
           <div
-            style={{ marginTop: 4, color: "var(--muted-strong)", fontSize: 13 }}
+            style={{
+              marginTop: 6,
+              color: "var(--muted-strong)",
+              fontSize: 13,
+              lineHeight: 1.35,
+            }}
           >
             {subtitle}
           </div>
@@ -309,7 +360,7 @@ export function TimelineItem({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "12px 1fr auto",
+        gridTemplateColumns: "12px minmax(0, 1fr)",
         gap: 14,
         alignItems: "start",
       }}
@@ -324,15 +375,32 @@ export function TimelineItem({
           boxShadow: `0 0 0 6px color-mix(in srgb, ${accent} 18%, transparent)`,
         }}
       />
-      <div style={{ display: "grid", gap: 5 }}>
-        <div style={{ fontWeight: 700, fontSize: 16 }}>{title}</div>
+      <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "start",
+            justifyContent: "space-between",
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              minWidth: 0,
+              fontWeight: 700,
+              fontSize: 16,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {title}
+          </div>
+          {action ? <div style={{ flex: "0 0 auto" }}>{action}</div> : null}
+        </div>
         <div style={{ color: "var(--muted-strong)", fontSize: 14 }}>
           {subtitle}
         </div>
-      </div>
-      <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
         <div style={{ color: "var(--muted)", fontSize: 13 }}>{meta}</div>
-        {action}
       </div>
     </div>
   );
@@ -352,9 +420,12 @@ export function GhostButton({
           padding: "10px 14px",
           color: "inherit",
           cursor: "pointer",
-          background: "color-mix(in srgb, var(--surface) 82%, transparent)",
-          fontWeight: 700,
+          background:
+            "linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 92%, transparent), color-mix(in srgb, var(--surface) 86%, transparent))",
+          fontWeight: 780,
           touchAction: "manipulation",
+          transition:
+            "transform 160ms ease, background 160ms ease, border-color 160ms ease",
         },
         style,
       )}
@@ -375,18 +446,19 @@ export function PrimaryButton({
       style={mergeStyles(
         {
           border: "none",
-          borderRadius: 22,
+          borderRadius: 24,
           minHeight: 58,
           padding: "14px 18px",
           color: "var(--primary-text)",
           background:
             "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 76%, var(--accent-2)) 62%, var(--accent-3))",
           fontSize: 16,
-          fontWeight: 760,
+          fontWeight: 840,
           cursor: "pointer",
           boxShadow:
-            "var(--inner-highlight), 0 18px 34px color-mix(in srgb, var(--accent) 20%, transparent)",
+            "var(--inner-highlight), 0 18px 38px color-mix(in srgb, var(--accent) 24%, transparent)",
           touchAction: "manipulation",
+          letterSpacing: "-0.01em",
         },
         style,
       )}
@@ -406,23 +478,12 @@ export function BottomTabs({
   onChange: (id: string) => void;
 }) {
   return (
-    <div
+    <nav
+      aria-label="Основная навигация"
+      className="bottom-tabs-shell"
       style={{
-        position: "fixed",
-        left: "50%",
-        width: "min(calc(100% - 28px), 980px)",
-        transform: "translateX(-50%)",
-        bottom: "max(16px, env(safe-area-inset-bottom))",
         display: "grid",
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-        gap: 8,
-        padding: 8,
-        borderRadius: 30,
-        background: "var(--nav-bg)",
-        backdropFilter: "blur(30px) saturate(180%)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--inner-highlight), 0 18px 48px rgba(0,0,0,0.22)",
-        zIndex: 30,
       }}
     >
       {items.map((item) => {
@@ -431,31 +492,28 @@ export function BottomTabs({
           <button
             key={item.id}
             type="button"
+            className="bottom-tab-button"
             onClick={() => onChange(item.id)}
+            aria-label={`Открыть раздел ${item.label}`}
+            aria-current={active ? "page" : undefined}
+            data-active={active ? "true" : "false"}
             style={{
-              border: "none",
-              minHeight: 58,
-              borderRadius: 22,
               background: active
-                ? "color-mix(in srgb, var(--accent) 18%, var(--surface-strong))"
+                ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, var(--surface-strong)), color-mix(in srgb, var(--surface) 84%, transparent))"
                 : "transparent",
               color: active ? "var(--text)" : "var(--muted)",
-              fontWeight: active ? 760 : 650,
-              display: "grid",
-              placeItems: "center",
-              gap: 4,
-              cursor: "pointer",
-              transition:
-                "background 160ms ease, color 160ms ease, transform 160ms ease",
-              touchAction: "manipulation",
+              fontWeight: active ? 840 : 700,
+              boxShadow: active
+                ? "var(--inner-highlight), 0 12px 24px color-mix(in srgb, var(--accent) 14%, transparent)"
+                : "none",
             }}
           >
-            <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
-            <span style={{ fontSize: 12 }}>{item.label}</span>
+            <span className="bottom-tab-icon">{item.icon}</span>
+            <span className="bottom-tab-label">{item.label}</span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 

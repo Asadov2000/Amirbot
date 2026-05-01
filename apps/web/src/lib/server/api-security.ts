@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { isTransientDbError } from "@amir/db";
+
 export class ApiError extends Error {
   public constructor(
     message: string,
@@ -17,6 +19,10 @@ const MAX_JSON_BODY_BYTES = 16_384;
 export function statusFromError(error: unknown) {
   if (error instanceof ApiError) {
     return error.statusCode;
+  }
+
+  if (isTransientDbError(error)) {
+    return 503;
   }
 
   const message = error instanceof Error ? error.message : String(error);
@@ -37,9 +43,11 @@ export function safeApiError(
       ? error.publicMessage
       : status === 403
         ? "Доступ запрещён. Откройте приложение через Telegram аккаунт мамы или папы."
-        : isProduction
-          ? fallbackMessage
-          : message;
+        : status === 503
+          ? "Сервер временно не готов. Данные не потеряны, повторите действие чуть позже."
+          : isProduction
+            ? fallbackMessage
+            : message;
 
   return NextResponse.json(
     {

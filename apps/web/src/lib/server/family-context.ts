@@ -104,11 +104,31 @@ export async function ensureDefaultFamilyContext(): Promise<DefaultFamilyContext
   const childBirthDate = parseBirthDate(DEFAULT_CHILD_BIRTH_DATE);
 
   return prisma.$transaction(async (tx) => {
+    const knownTelegramIds = [
+      momTelegramUserId,
+      dadTelegramUserId,
+      legacyMomTelegramUserId,
+      legacyDadTelegramUserId,
+    ];
+    const existingMembership = await tx.familyMember.findFirst({
+      where: {
+        deletedAt: null,
+        user: {
+          telegramUserId: { in: knownTelegramIds },
+          deletedAt: null,
+        },
+        family: {
+          deletedAt: null,
+        },
+      },
+      include: {
+        family: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
     let family =
-      (await tx.family.findFirst({
-        where: { deletedAt: null },
-        orderBy: { createdAt: "asc" },
-      })) ??
+      existingMembership?.family ??
       (await tx.family.create({
         data: {
           name: DEFAULT_FAMILY_NAME,

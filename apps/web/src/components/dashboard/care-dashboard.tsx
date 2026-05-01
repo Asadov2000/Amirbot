@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ActionButton,
@@ -27,14 +27,15 @@ import type {
   ActorId,
   CareEventKind,
   CareEventRecord,
+  DailySummary,
   EventDraft,
   EventStatus,
+  PeriodSummary,
   QuickItemKind,
   QuickItemRecord,
   SummaryPeriodId,
 } from "@/lib/types";
 import { useCareDashboard } from "@/hooks/use-care-dashboard";
-import { useThemePreference } from "@/hooks/use-theme-preference";
 
 type TabId = "home" | "log" | "feed" | "summary" | "export";
 type ActionId =
@@ -90,12 +91,22 @@ interface ActionDefinition {
   presets: ActionPreset[];
 }
 
+interface GrowthReading {
+  id: string;
+  label: string;
+  occurredAt: string;
+  weightKg: number | null;
+  heightCm: number | null;
+}
+
+type GrowthMetricKey = "weightKg" | "heightCm";
+
 const tabs = [
   { id: "home", label: "Главная", icon: "◉" },
-  { id: "log", label: "Лог", icon: "＋" },
+  { id: "log", label: "Запись", icon: "＋" },
   { id: "feed", label: "Лента", icon: "≋" },
-  { id: "summary", label: "Сводка", icon: "◫" },
-  { id: "export", label: "Экспорт", icon: "⇩" },
+  { id: "summary", label: "Итоги", icon: "◫" },
+  { id: "export", label: "Отчёт", icon: "⇩" },
 ] satisfies Array<{ id: TabId; label: string; icon: string }>;
 
 const kindFilterOptions: Array<{ id: FeedKindFilter; label: string }> = [
@@ -475,6 +486,49 @@ function getEventFieldValues(event: CareEventRecord): Record<string, string> {
   };
 }
 
+function isFiniteNumericInput(value: string) {
+  return Number.isFinite(Number(value.trim().replace(",", ".")));
+}
+
+function getSubmitValidationMessage(
+  action: ActionDefinition | undefined,
+  preset: ActionPreset | undefined,
+  inputValue: string,
+  fieldValues: Record<string, string>,
+) {
+  if (!action || !preset) {
+    return "Выберите действие.";
+  }
+
+  const text = inputValue.trim();
+  if (
+    (action.id === "note" ||
+      (action.id === "solid_food" && preset.inputLabel) ||
+      (action.id === "medication" && preset.inputLabel)) &&
+    !text
+  ) {
+    return action.id === "note"
+      ? "Введите короткую заметку."
+      : action.id === "solid_food"
+        ? "Введите прикорм или реакцию."
+        : "Введите лекарство или дозировку.";
+  }
+
+  if (preset.inputType === "number" && text && !isFiniteNumericInput(text)) {
+    return "Введите корректное число.";
+  }
+
+  if (
+    action.id === "growth" &&
+    !fieldValues.weightKg?.trim() &&
+    !fieldValues.heightCm?.trim()
+  ) {
+    return "Укажите вес или рост.";
+  }
+
+  return "";
+}
+
 function eventKindLabel(kind: CareEventKind): string {
   switch (kind) {
     case "FEEDING":
@@ -515,6 +569,384 @@ function dayTitle(value: string): string {
     day: "numeric",
     month: "long",
   }).format(new Date(value));
+}
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputToDayEnd(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    const fallback = new Date();
+    fallback.setHours(23, 59, 59, 999);
+    return fallback;
+  }
+
+  return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+function dateInputToLabel(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(dateInputToDayEnd(value));
+}
+
+function periodRangeEnd(value: string): number {
+  return dateInputToDayEnd(value).getTime();
+}
+
+function periodRangeStart(days: number | null, value: string): number {
+  if (days === null) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const end = dateInputToDayEnd(value);
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  start.setDate(start.getDate() - days + 1);
+  return start.getTime();
+}
+
+function buildSummaryForDate(
+  events: CareEventRecord[],
+  period: PeriodSummary,
+  dateValue: string,
+): PeriodSummary {
+  const start = periodRangeStart(period.days, dateValue);
+  const end = periodRangeEnd(dateValue);
+  const periodEvents = events.filter((event) => {
+    const timestamp = new Date(event.occurredAt).getTime();
+    return timestamp >= start && timestamp <= end;
+  });
+  const feedingEvents = periodEvents
+    .filter((event) => event.kind === "FEEDING")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+  const diaperEvents = periodEvents.filter((event) => event.kind === "DIAPER");
+  const sleepStarts = periodEvents
+    .filter(
+      (event) => event.kind === "SLEEP" && event.payload.phase === "START",
+    )
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+  const sleepEnds = periodEvents
+    .filter((event) => event.kind === "SLEEP" && event.payload.phase === "END")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+
+  let totalSleepMinutes = 0;
+  sleepStarts.forEach((startEvent, index) => {
+    const endEvent = sleepEnds[index];
+    const endTime = endEvent
+      ? new Date(endEvent.occurredAt).getTime()
+      : Math.min(Date.now(), end);
+    totalSleepMinutes += Math.max(
+      0,
+      Math.round((endTime - new Date(startEvent.occurredAt).getTime()) / 60000),
+    );
+  });
+
+  let intervalSum = 0;
+  for (let index = 1; index < feedingEvents.length; index += 1) {
+    intervalSum += Math.abs(
+      Math.round(
+        (new Date(feedingEvents[index].occurredAt).getTime() -
+          new Date(feedingEvents[index - 1].occurredAt).getTime()) /
+          60000,
+      ),
+    );
+  }
+
+  const summary: DailySummary = {
+    dateLabel: dateInputToLabel(dateValue),
+    feedingsCount: feedingEvents.length,
+    solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD")
+      .length,
+    totalSleepMinutes,
+    averageFeedingIntervalMinutes:
+      feedingEvents.length > 1
+        ? Math.round(intervalSum / (feedingEvents.length - 1))
+        : 0,
+    diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET")
+      .length,
+    diaperDirtyCount: diaperEvents.filter(
+      (event) => event.payload.type === "DIRTY",
+    ).length,
+    diaperMixedCount: diaperEvents.filter(
+      (event) => event.payload.type === "MIXED",
+    ).length,
+    temperatureReadingsCount: periodEvents.filter(
+      (event) => event.kind === "TEMPERATURE",
+    ).length,
+    medicationsCount: periodEvents.filter(
+      (event) => event.kind === "MEDICATION",
+    ).length,
+    growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH")
+      .length,
+  };
+
+  return {
+    ...summary,
+    id: period.id,
+    title: period.title,
+    days: period.days,
+  };
+}
+
+function getNumberPayload(
+  event: CareEventRecord,
+  key: "weightKg" | "heightCm",
+): number | null {
+  const value = event.payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getGrowthReadings(events: CareEventRecord[]): GrowthReading[] {
+  return events
+    .filter((event) => event.kind === "GROWTH")
+    .map((event) => ({
+      id: event.id,
+      label: new Intl.DateTimeFormat("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+      }).format(new Date(event.occurredAt)),
+      occurredAt: event.occurredAt,
+      weightKg: getNumberPayload(event, "weightKg"),
+      heightCm: getNumberPayload(event, "heightCm"),
+    }))
+    .filter((reading) => reading.weightKg !== null || reading.heightCm !== null)
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+}
+
+function growthMetricLabel(key: GrowthMetricKey): string {
+  return key === "weightKg" ? "Вес" : "Рост";
+}
+
+function growthMetricUnit(key: GrowthMetricKey): string {
+  return key === "weightKg" ? "кг" : "см";
+}
+
+function formatGrowthValue(value: number | null, key: GrowthMetricKey): string {
+  if (value === null) {
+    return "нет";
+  }
+
+  return key === "weightKg"
+    ? `${value.toFixed(2).replace(".", ",")} кг`
+    : `${Math.round(value)} см`;
+}
+
+function formatGrowthDelta(value: number | null, key: GrowthMetricKey): string {
+  if (value === null) {
+    return "первое измерение";
+  }
+
+  const sign = value > 0 ? "+" : "";
+  if (Math.abs(value) < 0.01) {
+    return `без изменений`;
+  }
+
+  return key === "weightKg"
+    ? `${sign}${value.toFixed(2).replace(".", ",")} кг`
+    : `${sign}${Math.round(value)} см`;
+}
+
+function growthMetricValues(readings: GrowthReading[], key: GrowthMetricKey) {
+  return readings
+    .map((reading) => ({
+      id: reading.id,
+      label: reading.label,
+      occurredAt: reading.occurredAt,
+      value: reading[key],
+    }))
+    .filter(
+      (
+        item,
+      ): item is {
+        id: string;
+        label: string;
+        occurredAt: string;
+        value: number;
+      } => item.value !== null,
+    );
+}
+
+function growthSeriesPoints(
+  readings: GrowthReading[],
+  key: GrowthMetricKey,
+): Array<{ x: number; y: number; value: number; label: string }> {
+  const metricValues = growthMetricValues(readings, key);
+  const values = metricValues.map((item) => item.value);
+
+  if (!values.length) {
+    return [];
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const width = 320;
+  const height = 126;
+  const pad = 18;
+  const range = max - min || 1;
+
+  return metricValues.map((reading, index) => {
+    const x =
+      metricValues.length === 1
+        ? width / 2
+        : pad + (index / (metricValues.length - 1)) * (width - pad * 2);
+    const y = pad + (1 - (reading.value - min) / range) * (height - pad * 2);
+    return { x, y, value: reading.value, label: reading.label };
+  });
+}
+
+function GrowthMetricPanel({
+  readings,
+  metricKey,
+}: {
+  readings: GrowthReading[];
+  metricKey: GrowthMetricKey;
+}) {
+  const values = growthMetricValues(readings, metricKey);
+  const latest = values.at(-1);
+  const previous = values.at(-2);
+  const delta = latest && previous ? latest.value - previous.value : null;
+  const min = values.length
+    ? Math.min(...values.map((item) => item.value))
+    : null;
+  const max = values.length
+    ? Math.max(...values.map((item) => item.value))
+    : null;
+  const points = growthSeriesPoints(readings, metricKey);
+  const path = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const tone = metricKey === "weightKg" ? "weight" : "height";
+  const title = growthMetricLabel(metricKey);
+
+  return (
+    <Surface className={`growth-panel growth-panel-${tone}`}>
+      <div className="growth-panel-head">
+        <div>
+          <div className="growth-panel-label">{title}</div>
+          <div className="growth-panel-value">
+            {formatGrowthValue(latest?.value ?? null, metricKey)}
+          </div>
+        </div>
+        <Pill>{latest?.label ?? "нет"}</Pill>
+      </div>
+      {values.length ? (
+        <>
+          <div className="growth-panel-meta">
+            <span>{formatGrowthDelta(delta, metricKey)}</span>
+            <span>
+              {formatGrowthValue(min, metricKey)} -{" "}
+              {formatGrowthValue(max, metricKey)}
+            </span>
+          </div>
+          <div className="growth-mini-chart-wrap">
+            <svg
+              className="growth-mini-chart"
+              viewBox="0 0 320 126"
+              role="img"
+              aria-label={`${title}: ${formatGrowthValue(latest?.value ?? null, metricKey)}`}
+            >
+              <line x1="16" y1="16" x2="304" y2="16" />
+              <line x1="16" y1="63" x2="304" y2="63" />
+              <line x1="16" y1="110" x2="304" y2="110" />
+              {points.length > 1 ? <polyline points={path} /> : null}
+              {points.map((point) => (
+                <circle
+                  key={`${metricKey}-${point.label}-${point.x}-${point.y}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={points.length === 1 ? "6" : "4.5"}
+                />
+              ))}
+            </svg>
+          </div>
+          <div className="growth-axis-row">
+            <span>{values[0]?.label}</span>
+            <span>
+              {values.length} {values.length === 1 ? "замер" : "замеров"}
+            </span>
+            <span>{values.at(-1)?.label}</span>
+          </div>
+        </>
+      ) : (
+        <div className="growth-panel-empty">
+          Нет данных по {growthMetricUnit(metricKey)}.
+        </div>
+      )}
+    </Surface>
+  );
+}
+
+function GrowthChart({ readings }: { readings: GrowthReading[] }) {
+  const latestWeight = [...readings]
+    .reverse()
+    .find((reading) => reading.weightKg !== null);
+  const latestHeight = [...readings]
+    .reverse()
+    .find((reading) => reading.heightCm !== null);
+
+  return (
+    <Card className="growth-card">
+      <SectionTitle
+        eyebrow="Развитие"
+        title="Вес и рост"
+        action={
+          readings.length ? <Pill>{readings.at(-1)?.label}</Pill> : undefined
+        }
+      />
+      {readings.length ? (
+        <>
+          <div className="growth-summary-row">
+            <Surface className="growth-summary-tile">
+              <span>Вес</span>
+              <strong>
+                {formatGrowthValue(latestWeight?.weightKg ?? null, "weightKg")}
+              </strong>
+            </Surface>
+            <Surface className="growth-summary-tile">
+              <span>Рост</span>
+              <strong>
+                {formatGrowthValue(latestHeight?.heightCm ?? null, "heightCm")}
+              </strong>
+            </Surface>
+            <Surface className="growth-summary-tile">
+              <span>Измерений</span>
+              <strong>{readings.length}</strong>
+            </Surface>
+          </div>
+          <div className="growth-panel-grid">
+            <GrowthMetricPanel readings={readings} metricKey="weightKg" />
+            <GrowthMetricPanel readings={readings} metricKey="heightCm" />
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="Измерений пока нет"
+          description="После записи веса или роста здесь появится динамика."
+        />
+      )}
+    </Card>
+  );
 }
 
 function getHistoryPresets(
@@ -729,6 +1161,95 @@ function accentFromEvent(kind: CareEventKind): string {
   }
 }
 
+function minutesSince(iso?: string) {
+  if (!iso) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.max(
+    0,
+    Math.round((Date.now() - new Date(iso).getTime()) / 60000),
+  );
+}
+
+function latestEvent(
+  events: CareEventRecord[],
+  kind: CareEventKind,
+  predicate: (event: CareEventRecord) => boolean = () => true,
+) {
+  return events.find((event) => event.kind === kind && predicate(event));
+}
+
+function buildNextCareStep(
+  snapshot: NonNullable<ReturnType<typeof useCareDashboard>["snapshot"]>,
+) {
+  const lastFeed = latestEvent(snapshot.events, "FEEDING");
+  const lastDiaper = latestEvent(snapshot.events, "DIAPER");
+  const lastTemperature = latestEvent(snapshot.events, "TEMPERATURE");
+  const sleeping = Boolean(snapshot.timers.sleepStartedAt);
+  const feedMinutes = minutesSince(lastFeed?.occurredAt);
+  const diaperMinutes = minutesSince(lastDiaper?.occurredAt);
+  const temperatureValue = Number(lastTemperature?.payload.temperatureC ?? 0);
+
+  if (snapshot.events.length === 0) {
+    return {
+      title: "Начните с первой записи",
+      body: "Одно нажатие создаст общий журнал для мамы и папы.",
+      action: "Добавить событие",
+      actionId: "log" as const,
+      tone: "default",
+    };
+  }
+
+  if (sleeping) {
+    return {
+      title: "Сон идёт",
+      body: "Когда Амир проснётся, завершите сон, чтобы сводка считалась точно.",
+      action: "Завершить сон",
+      actionId: "sleep" as ActionId,
+      tone: "calm",
+    };
+  }
+
+  if (temperatureValue >= 37.5) {
+    return {
+      title: "Температура под контролем",
+      body: "Полезно повторить замер и держать лекарства в быстром доступе.",
+      action: "Замерить",
+      actionId: "temperature" as ActionId,
+      tone: "danger",
+    };
+  }
+
+  if (feedMinutes >= 180) {
+    return {
+      title: "Пора проверить кормление",
+      body: `Последняя запись: ${lastFeed?.summary ?? "пока нет"} — ${snapshot.overview.lastFeeding}.`,
+      action: "Кормление",
+      actionId: "feeding" as ActionId,
+      tone: "warm",
+    };
+  }
+
+  if (diaperMinutes >= 120) {
+    return {
+      title: "Проверьте подгузник",
+      body: `С последней смены прошло: ${snapshot.overview.diaperGap}.`,
+      action: "Подгузник",
+      actionId: "diaper" as ActionId,
+      tone: "warm",
+    };
+  }
+
+  return {
+    title: "Режим выглядит спокойно",
+    body: "Ключевые интервалы в норме. Следите за сном, кормлением и подгузником.",
+    action: "Открыть ленту",
+    actionId: "feed" as const,
+    tone: "default",
+  };
+}
+
 export function CareDashboard() {
   const {
     snapshot,
@@ -738,7 +1259,9 @@ export function CareDashboard() {
     loading,
     syncing,
     pendingCount,
+    conflictCount,
     online,
+    lastSyncedAt,
     accessDenied,
     aiAnswer,
     error,
@@ -750,8 +1273,6 @@ export function CareDashboard() {
     downloadExport,
     deleteQuickItem,
   } = useCareDashboard();
-  const { theme, setTheme } = useThemePreference();
-
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [sheetActionId, setSheetActionId] = useState<ActionId | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
@@ -765,6 +1286,9 @@ export function CareDashboard() {
     null,
   );
   const [summaryPeriodId, setSummaryPeriodId] = useState<SummaryPeriodId>("1d");
+  const [summaryDateValue, setSummaryDateValue] = useState(() =>
+    toDateInputValue(new Date()),
+  );
   const [feedKindFilter, setFeedKindFilter] = useState<FeedKindFilter>("ALL");
   const [feedActorFilter, setFeedActorFilter] = useState<ActorFilter>("ALL");
   const [exportPeriodId, setExportPeriodId] = useState<SummaryPeriodId>("30d");
@@ -772,7 +1296,17 @@ export function CareDashboard() {
     useState<FeedKindFilter>("ALL");
   const [exportActorFilter, setExportActorFilter] =
     useState<ActorFilter>("ALL");
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | null>(
+    null,
+  );
+  const [exportError, setExportError] = useState("");
+  const [deletingQuickItemKey, setDeletingQuickItemKey] = useState<
+    string | null
+  >(null);
   const [submitting, setSubmitting] = useState(false);
+  const sheetPanelRef = useRef<HTMLDivElement>(null);
+  const mainInputRef = useRef<HTMLInputElement>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const currentAction = actionById(sheetActionId);
   const currentPresets = currentAction
@@ -782,6 +1316,13 @@ export function CareDashboard() {
     currentPresets.find((preset) => preset.id === selectedPresetId) ??
     currentPresets[0];
   const canChangeActor = !actorLocked;
+  const submitValidationMessage = getSubmitValidationMessage(
+    currentAction,
+    currentPreset,
+    inputValue,
+    fieldValues,
+  );
+  const submitDisabled = submitting || Boolean(submitValidationMessage);
 
   const openCreateSheet = (actionId: ActionId) => {
     const action = actionById(actionId);
@@ -827,24 +1368,58 @@ export function CareDashboard() {
     setEditingEvent(null);
   };
 
+  useEffect(() => {
+    if (!currentAction) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      sheetPanelRef.current?.focus({ preventScroll: true });
+    });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeSheet();
+        return;
+      }
+
+      if (event.key !== "Tab" || !sheetPanelRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(
+        sheetPanelRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null);
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [currentAction]);
+
   const handleSubmit = async () => {
     if (!currentAction || !currentPreset) {
       return;
     }
 
-    if (
-      currentPreset.inputType === "text" &&
-      currentAction.id === "note" &&
-      !inputValue.trim()
-    ) {
-      return;
-    }
-
-    if (
-      currentAction.id === "growth" &&
-      !fieldValues.weightKg?.trim() &&
-      !fieldValues.heightCm?.trim()
-    ) {
+    if (submitValidationMessage) {
       return;
     }
 
@@ -874,6 +1449,8 @@ export function CareDashboard() {
         await addEvent(draft);
       }
       closeSheet();
+    } catch {
+      // Ошибка уже показана верхним баннером; форму оставляем открытой.
     } finally {
       setSubmitting(false);
     }
@@ -884,18 +1461,37 @@ export function CareDashboard() {
       return;
     }
 
-    const accepted = window.confirm(
-      `Удалить быструю кнопку «${preset.quickItem.label}»? История событий останется.`,
-    );
-    if (!accepted) {
-      return;
+    setDeletingQuickItemKey(preset.quickItem.key);
+    try {
+      await deleteQuickItem(
+        preset.quickItem.kind,
+        preset.quickItem.label,
+        preset.quickItem.key,
+      );
+      if (selectedPresetId === preset.id) {
+        setSelectedPresetId("");
+      }
+    } catch {
+      // Верхний баннер покажет ошибку; список не трогаем.
+    } finally {
+      setDeletingQuickItemKey(null);
     }
+  };
 
-    await deleteQuickItem(
-      preset.quickItem.kind,
-      preset.quickItem.label,
-      preset.quickItem.key,
-    );
+  const handleExportDownload = async (format: "pdf" | "csv") => {
+    setExportingFormat(format);
+    setExportError("");
+    try {
+      await downloadExport(format, exportFilters);
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось скачать файл экспорта.",
+      );
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   if (accessDenied) {
@@ -953,7 +1549,7 @@ export function CareDashboard() {
     );
   }
 
-  const activeSummary =
+  const activeSummaryTemplate =
     snapshot.periodSummaries.find(
       (summary) => summary.id === summaryPeriodId,
     ) ??
@@ -964,6 +1560,12 @@ export function CareDashboard() {
       title: "1 день",
       days: 1,
     } as const);
+  const activeSummary = buildSummaryForDate(
+    snapshot.events,
+    activeSummaryTemplate,
+    summaryDateValue,
+  );
+  const growthReadings = getGrowthReadings(snapshot.events);
 
   const summaryMetrics = [
     {
@@ -1008,7 +1610,6 @@ export function CareDashboard() {
     },
   ];
 
-  const latestGrowth = snapshot.events.find((event) => event.kind === "GROWTH");
   const filteredFeedEvents = snapshot.events.filter((event) => {
     const matchesKind =
       feedKindFilter === "ALL" || event.kind === feedKindFilter;
@@ -1038,281 +1639,135 @@ export function CareDashboard() {
     kind: exportKindFilter === "ALL" ? "all" : exportKindFilter,
     actor: exportActorFilter === "ALL" ? "all" : exportActorFilter,
   };
-
+  const primaryActions = orderedActions.filter((action) =>
+    ["feeding", "diaper", "sleep", "temperature"].includes(action.id),
+  );
+  const secondaryActions = orderedActions.filter(
+    (action) => !primaryActions.includes(action),
+  );
+  const exportPeriodLabel =
+    snapshot.periodSummaries.find((summary) => summary.id === exportPeriodId)
+      ?.title ?? "период";
+  const exportKindLabel =
+    kindFilterOptions.find((option) => option.id === exportKindFilter)?.label ??
+    "Все";
+  const exportActorLabel =
+    actorFilterOptions.find((option) => option.id === exportActorFilter)
+      ?.label ?? "Оба";
+  const nextCareStep = buildNextCareStep(snapshot);
+  const syncLabel =
+    conflictCount > 0
+      ? `${conflictCount} запись требует проверки`
+      : !online
+        ? "Оффлайн"
+        : pendingCount > 0
+          ? `${pendingCount} ждёт синхронизации`
+          : syncing
+            ? "Синхронизация"
+            : lastSyncedAt
+              ? `Актуально в ${formatTime(lastSyncedAt)}`
+              : "Актуально";
   const renderHome = () => (
     <>
       <section className="dashboard-section">
-        <Card className="hero-card">
+        <Card className="hero-card command-center-card">
           <div className="hero-topline">
             <div>
-              <div className="eyebrow">Панель ухода</div>
+              <div className="eyebrow">Состояние ребёнка</div>
               <h1 className="hero-title">{snapshot.child.name}</h1>
             </div>
-            <div className="status-pills">
-              <div className="theme-switch" aria-label="Тема приложения">
-                <button
-                  type="button"
-                  className={
-                    theme === "dark" ? "theme-option active" : "theme-option"
-                  }
-                  onClick={() => setTheme("dark")}
-                >
-                  Тёмная
-                </button>
-                <button
-                  type="button"
-                  className={
-                    theme === "light" ? "theme-option active" : "theme-option"
-                  }
-                  onClick={() => setTheme("light")}
-                >
-                  Светлая
-                </button>
-              </div>
-            </div>
+            <Pill>{snapshot.overview.age}</Pill>
           </div>
 
-          <div className="role-settings-card">
-            <div>
-              <div className="role-settings-title">Профиль родителя</div>
-              <div className="role-settings-copy">
-                {canChangeActor
-                  ? "Выберите один раз. Роль сохранится на этом устройстве."
-                  : "Роль определена по Telegram ID и защищена от смены."}
-              </div>
-            </div>
-            <div className="actor-toggle compact">
-              {canChangeActor ? (
-                (["mom", "dad"] as ActorId[]).map((actor) => (
-                  <button
-                    key={actor}
-                    type="button"
-                    onClick={() => changeActor(actor)}
-                    className={
-                      actor === activeActor ? "actor-chip active" : "actor-chip"
-                    }
-                  >
-                    {actorLabel(actor)}
-                  </button>
-                ))
-              ) : (
-                <button type="button" className="actor-chip active" disabled>
-                  {actorDisplayName}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="home-focus-grid">
-            <Surface>
+          <div className="command-metrics">
+            <Surface className="command-metric">
+              <InlineMetric
+                label="Возраст"
+                value={snapshot.overview.age}
+                helper="по дате рождения"
+              />
+            </Surface>
+            <Surface className="command-metric">
               <InlineMetric
                 label="Кормление"
                 value={snapshot.overview.lastFeeding}
                 helper="последняя запись"
               />
             </Surface>
-            <Surface>
+            <Surface className="command-metric">
               <InlineMetric
                 label="Сон"
                 value={snapshot.overview.sleepStatus}
-                helper="текущий статус"
+                helper={
+                  snapshot.timers.sleepStartedAt
+                    ? `идёт с ${formatTime(snapshot.timers.sleepStartedAt)}`
+                    : "сейчас бодрствует"
+                }
               />
             </Surface>
-            <Surface>
+            <Surface className="command-metric">
               <InlineMetric
-                label="Вес и рост"
-                value={latestGrowth?.summary ?? "ещё не измеряли"}
-                helper="последний контроль"
+                label="Подгузник"
+                value={snapshot.overview.diaperGap}
+                helper="последняя смена"
+              />
+            </Surface>
+            <Surface className="command-metric">
+              <InlineMetric
+                label="Температура"
+                value={snapshot.overview.temperature}
+                helper="последний замер"
+              />
+            </Surface>
+            <Surface className="command-metric">
+              <InlineMetric
+                label="Лекарства"
+                value={snapshot.overview.medication}
+                helper="последняя отметка"
               />
             </Surface>
           </div>
+
+          <div className={`care-now-card info-only tone-${nextCareStep.tone}`}>
+            <div>
+              <div className="care-now-kicker">Текущее состояние</div>
+              <div className="care-now-title">{nextCareStep.title}</div>
+              <div className="care-now-body">{nextCareStep.body}</div>
+            </div>
+          </div>
+
+          <div className="sync-panel">
+            <div>
+              <div
+                className="sync-dot"
+                data-state={
+                  conflictCount > 0 ? "conflict" : online ? "online" : "offline"
+                }
+              />
+              <span>{syncLabel}</span>
+            </div>
+          </div>
+          {conflictCount > 0 ? (
+            <div className="sync-warning">
+              На другом устройстве эта запись уже изменилась. Откройте ленту,
+              проверьте запись и сохраните исправление повторно.
+            </div>
+          ) : null}
         </Card>
       </section>
 
       <section className="dashboard-section">
-        <SectionTitle eyebrow="Сейчас" title="Главные показатели" />
-        <div className="stats-grid">
-          <StatTile
-            label="Возраст"
-            value={snapshot.overview.age}
-            helper="от 0 мес до 3 лет"
-            accent="#67e8f9"
-          />
-          <StatTile
-            label="Последнее кормление"
-            value={snapshot.overview.lastFeeding}
-            helper="по журналу ухода"
-            accent="#8b5cf6"
-          />
-          <StatTile
-            label="Сон"
-            value={snapshot.overview.sleepStatus}
-            helper="таймер сна активен"
-            accent="#60a5fa"
-          />
-          <StatTile
-            label="Подгузник"
-            value={snapshot.overview.diaperGap}
-            helper="время с последней смены"
-            accent="#f59e0b"
-          />
-          <StatTile
-            label="Температура"
-            value={snapshot.overview.temperature}
-            helper="статистика и тревога"
-            accent="#fb7185"
-          />
-          <StatTile
-            label="Лекарства"
-            value={snapshot.overview.medication}
-            helper="последний приём"
-            accent="#f97316"
-          />
-        </div>
-      </section>
-
-      <section className="dashboard-section dashboard-two-columns">
-        <Card>
-          <SectionTitle
-            eyebrow="Основные действия"
-            title="Одно нажатие ночью"
-          />
-          <div className="actions-grid">
-            {orderedActions.map((action) => (
-              <ActionButton
-                key={action.id}
-                icon={action.icon}
-                title={action.title}
-                subtitle={actionSubtitle(action, activeActor)}
-                onClick={() => openCreateSheet(action.id)}
-              />
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <SectionTitle eyebrow="Таймеры" title="Ближайшие окна" />
-          <div className="timers-grid">
-            <InlineMetric
-              label="Сон идёт"
-              value={
-                snapshot.timers.sleepDurationMinutes
-                  ? formatDuration(snapshot.timers.sleepDurationMinutes)
-                  : "нет"
-              }
-              helper={
-                snapshot.timers.sleepStartedAt
-                  ? `Старт в ${formatTime(snapshot.timers.sleepStartedAt)}`
-                  : "ребёнок не спит"
-              }
-            />
-            <InlineMetric
-              label="Следующее кормление"
-              value={
-                snapshot.timers.nextFeedingAt
-                  ? formatTime(snapshot.timers.nextFeedingAt)
-                  : "—"
-              }
-              helper="подсказка для напоминаний"
-            />
-            <InlineMetric
-              label="Проверка подгузника"
-              value={
-                snapshot.timers.nextDiaperCheckAt
-                  ? formatTime(snapshot.timers.nextDiaperCheckAt)
-                  : "—"
-              }
-              helper="на основе последней смены"
-            />
-          </div>
-        </Card>
-      </section>
-
-      <section className="dashboard-section dashboard-two-columns">
-        <Card>
-          <SectionTitle
-            eyebrow="Лента семьи"
-            title="Последние действия"
-            action={
-              <GhostButton onClick={() => setActiveTab("feed")}>
-                Вся лента
-              </GhostButton>
-            }
-          />
-          <div className="timeline-list">
-            {snapshot.events.length ? (
-              snapshot.events
-                .slice(0, 4)
-                .map((event) => (
-                  <TimelineItem
-                    key={event.id}
-                    title={event.summary}
-                    subtitle={`${actorLabel(event.actor)} • ${event.kind.toLowerCase()}`}
-                    meta={formatDateTime(event.occurredAt)}
-                    accent={accentFromEvent(event.kind)}
-                    action={
-                      <GhostButton onClick={() => openEditSheet(event)}>
-                        Исправить
-                      </GhostButton>
-                    }
-                  />
-                ))
-            ) : (
-              <EmptyState
-                title="Лента пока пустая"
-                description="Здесь появятся только реальные действия мамы и папы."
-              />
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <SectionTitle eyebrow="Напоминания" title="Кому и когда напомнить" />
-          <div className="stack-list">
-            {snapshot.reminders.length ? (
-              snapshot.reminders.map((reminder) => (
-                <Surface
-                  key={reminder.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 16,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>
-                      {reminder.title}
-                    </div>
-                    <div style={{ marginTop: 4, color: "var(--muted-strong)" }}>
-                      {reminder.channel === "bot"
-                        ? "Придёт в Telegram боте"
-                        : "Покажется в Mini App"}
-                    </div>
-                  </div>
-                  <Pill tone={reminder.tone}>{reminder.dueLabel}</Pill>
-                </Surface>
-              ))
-            ) : (
-              <EmptyState
-                title="Напоминаний пока нет"
-                description="Они появятся после первых кормлений, подгузников или лекарств."
-              />
-            )}
-          </div>
-        </Card>
+        <GrowthChart readings={growthReadings} />
       </section>
     </>
   );
 
   const renderLog = () => (
     <section className="dashboard-section">
-      <Card>
-        <SectionTitle
-          eyebrow="Запись событий"
-          title="Минимум ввода, максимум скорости"
-        />
-        <div className="actions-grid">
-          {orderedActions.map((action) => (
+      <Card className="log-command-card">
+        <SectionTitle eyebrow="Запись" title="Главные действия под рукой" />
+        <div className="log-primary-grid">
+          {primaryActions.map((action) => (
             <ActionButton
               key={action.id}
               icon={action.icon}
@@ -1321,6 +1776,27 @@ export function CareDashboard() {
               onClick={() => openCreateSheet(action.id)}
             />
           ))}
+        </div>
+        <div className="log-secondary-panel">
+          <div>
+            <div className="filter-title">Ещё записи</div>
+            <div className="log-secondary-copy">
+              Прикорм, лекарства, заметки и контроль роста без длинных форм.
+            </div>
+          </div>
+          <div className="log-secondary-grid">
+            {secondaryActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className="log-secondary-button"
+                onClick={() => openCreateSheet(action.id)}
+              >
+                <span>{action.icon}</span>
+                <strong>{action.title}</strong>
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
     </section>
@@ -1341,6 +1817,7 @@ export function CareDashboard() {
                     ? "filter-chip active"
                     : "filter-chip"
                 }
+                aria-pressed={feedKindFilter === option.id}
                 onClick={() => setFeedKindFilter(option.id)}
               >
                 {option.label}
@@ -1357,6 +1834,7 @@ export function CareDashboard() {
                     ? "filter-chip active"
                     : "filter-chip"
                 }
+                aria-pressed={feedActorFilter === option.id}
                 onClick={() => setFeedActorFilter(option.id)}
               >
                 {option.label}
@@ -1390,8 +1868,15 @@ export function CareDashboard() {
                             {formatDateTime(event.occurredAt)}
                           </div>
                         </div>
-                        <GhostButton onClick={() => openEditSheet(event)}>
-                          Исправить
+                        <GhostButton
+                          style={{
+                            minHeight: 34,
+                            padding: "7px 10px",
+                            fontSize: 12,
+                          }}
+                          onClick={() => openEditSheet(event)}
+                        >
+                          Править
                         </GhostButton>
                       </div>
                       <div className="feed-card-badges">
@@ -1433,11 +1918,24 @@ export function CareDashboard() {
                   ? "period-tab active"
                   : "period-tab"
               }
+              aria-pressed={summaryPeriodId === summary.id}
               onClick={() => setSummaryPeriodId(summary.id)}
             >
               {summary.title}
             </button>
           ))}
+        </div>
+        <label className="summary-date-field">
+          <span>Дата окончания периода</span>
+          <input
+            type="date"
+            value={summaryDateValue}
+            max={toDateInputValue(new Date())}
+            onChange={(event) => setSummaryDateValue(event.target.value)}
+          />
+        </label>
+        <div className="summary-date-copy">
+          Сводка считается до {activeSummary.dateLabel} включительно.
         </div>
         <div className="metrics-grid">
           {summaryMetrics.map((metric) => (
@@ -1510,9 +2008,34 @@ export function CareDashboard() {
   );
 
   const renderExport = () => (
-    <section className="dashboard-section dashboard-two-columns">
-      <Card>
-        <SectionTitle eyebrow="Для врача" title="Экспорт данных" />
+    <section className="dashboard-section">
+      <Card className="export-command-card">
+        <SectionTitle eyebrow="Для врача" title="Отчёт за 10 секунд" />
+        {exportError ? (
+          <div className="error-banner" role="alert">
+            {exportError}
+          </div>
+        ) : null}
+        <div className="export-hero">
+          <div>
+            <div className="export-hero-title">Готовый PDF для приёма</div>
+            <div className="export-hero-copy">
+              По умолчанию: выбранный период, все важные события, понятная
+              сводка и хронология.
+            </div>
+            <div className="export-preview-row">
+              <Pill>{exportPeriodLabel}</Pill>
+              <Pill>{exportKindLabel}</Pill>
+              <Pill>{exportActorLabel}</Pill>
+            </div>
+          </div>
+          <PrimaryButton
+            disabled={exportingFormat !== null}
+            onClick={() => void handleExportDownload("pdf")}
+          >
+            {exportingFormat === "pdf" ? "Готовлю PDF…" : "Скачать PDF"}
+          </PrimaryButton>
+        </div>
         <div className="export-filter-grid">
           <Surface>
             <div className="filter-title">Период</div>
@@ -1526,6 +2049,7 @@ export function CareDashboard() {
                       ? "filter-chip active"
                       : "filter-chip"
                   }
+                  aria-pressed={exportPeriodId === summary.id}
                   onClick={() => setExportPeriodId(summary.id)}
                 >
                   {summary.title}
@@ -1545,6 +2069,7 @@ export function CareDashboard() {
                       ? "filter-chip active"
                       : "filter-chip"
                   }
+                  aria-pressed={exportKindFilter === option.id}
                   onClick={() => setExportKindFilter(option.id)}
                 >
                   {option.label}
@@ -1564,6 +2089,7 @@ export function CareDashboard() {
                       ? "filter-chip active"
                       : "filter-chip"
                   }
+                  aria-pressed={exportActorFilter === option.id}
                   onClick={() => setExportActorFilter(option.id)}
                 >
                   {option.label}
@@ -1574,27 +2100,9 @@ export function CareDashboard() {
         </div>
         <div className="stack-list">
           <Surface>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>PDF</div>
-            <div
-              style={{
-                marginTop: 8,
-                color: "var(--muted-strong)",
-                lineHeight: 1.6,
-              }}
-            >
-              Аккуратная сводка по периодам, текущему статусу и событиям для
-              врача.
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              Нужны сырые данные?
             </div>
-            <div style={{ marginTop: 16 }}>
-              <PrimaryButton
-                onClick={() => void downloadExport("pdf", exportFilters)}
-              >
-                Скачать PDF
-              </PrimaryButton>
-            </div>
-          </Surface>
-          <Surface>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>CSV</div>
             <div
               style={{
                 marginTop: 8,
@@ -1607,45 +2115,11 @@ export function CareDashboard() {
             </div>
             <div style={{ marginTop: 16 }}>
               <PrimaryButton
-                onClick={() => void downloadExport("csv", exportFilters)}
+                disabled={exportingFormat !== null}
+                onClick={() => void handleExportDownload("csv")}
               >
-                Скачать CSV
+                {exportingFormat === "csv" ? "Готовлю CSV…" : "Скачать CSV"}
               </PrimaryButton>
-            </div>
-          </Surface>
-        </div>
-      </Card>
-
-      <Card>
-        <SectionTitle
-          eyebrow="Риски и статус"
-          title="Что важно помнить сейчас"
-        />
-        <div className="stack-list">
-          <Surface>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Оффлайн-режим</div>
-            <div
-              style={{
-                marginTop: 8,
-                color: "var(--muted-strong)",
-                lineHeight: 1.6,
-              }}
-            >
-              Даже без сети новые события не теряются: они сохраняются локально
-              и уйдут в синхронизацию при следующем подключении.
-            </div>
-          </Surface>
-          <Surface>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Текущая очередь</div>
-            <div
-              style={{
-                marginTop: 8,
-                color: "var(--muted-strong)",
-                lineHeight: 1.6,
-              }}
-            >
-              В ожидании отправки: {pendingCount}. Онлайн-статус:{" "}
-              {online ? "есть сеть" : "нет сети"}.
             </div>
           </Surface>
         </div>
@@ -1675,7 +2149,7 @@ export function CareDashboard() {
   return (
     <div className="page-shell">
       {error ? (
-        <div className="error-banner">
+        <div className="error-banner" role="alert">
           <span>{error}</span>
         </div>
       ) : null}
@@ -1696,9 +2170,12 @@ export function CareDashboard() {
           onClick={closeSheet}
         >
           <div
+            ref={sheetPanelRef}
             className="sheet-panel"
             role="dialog"
             aria-modal="true"
+            aria-labelledby="care-entry-sheet-title"
+            tabIndex={-1}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sheet-header">
@@ -1706,7 +2183,7 @@ export function CareDashboard() {
                 <div className="eyebrow">
                   {editingEvent ? "Исправление" : "Новая запись"}
                 </div>
-                <h3>{currentAction.title}</h3>
+                <h3 id="care-entry-sheet-title">{currentAction.title}</h3>
               </div>
               <GhostButton onClick={closeSheet}>Закрыть</GhostButton>
             </div>
@@ -1736,6 +2213,7 @@ export function CareDashboard() {
                           ? "actor-chip active"
                           : "actor-chip"
                       }
+                      aria-pressed={actor === sheetActor}
                     >
                       {actorLabel(actor)}
                     </button>
@@ -1753,11 +2231,15 @@ export function CareDashboard() {
                 <div key={preset.id} className="preset-row">
                   <button
                     type="button"
-                    className={
+                    className={[
                       preset.id === selectedPresetId
                         ? "preset-card active"
-                        : "preset-card"
-                    }
+                        : "preset-card",
+                      preset.quickItem ? "with-delete" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-pressed={preset.id === selectedPresetId}
                     onClick={() => {
                       setSelectedPresetId(preset.id);
                       setInputValue(preset.defaultInput ?? "");
@@ -1782,9 +2264,16 @@ export function CareDashboard() {
                       type="button"
                       className="quick-delete-button"
                       aria-label={`Удалить ${preset.label}`}
-                      onClick={() => void handleDeleteQuickItem(preset)}
+                      disabled={deletingQuickItemKey === preset.quickItem.key}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDeleteQuickItem(preset);
+                      }}
                     >
-                      Удалить
+                      {deletingQuickItemKey === preset.quickItem.key
+                        ? "…"
+                        : "×"}
                     </button>
                   ) : null}
                 </div>
@@ -1804,9 +2293,16 @@ export function CareDashboard() {
               <label className="field">
                 <span>{currentPreset.inputLabel}</span>
                 <input
+                  ref={mainInputRef}
                   type={currentPreset.inputType ?? "text"}
                   value={inputValue}
                   placeholder={currentPreset.inputPlaceholder}
+                  aria-invalid={Boolean(submitValidationMessage)}
+                  aria-describedby={
+                    submitValidationMessage
+                      ? "care-entry-validation"
+                      : undefined
+                  }
                   onChange={(event) => setInputValue(event.target.value)}
                 />
               </label>
@@ -1814,13 +2310,20 @@ export function CareDashboard() {
 
             {currentPreset.fields?.length ? (
               <div className="field-grid">
-                {currentPreset.fields.map((field) => (
+                {currentPreset.fields.map((field, index) => (
                   <label className="field" key={field.id}>
                     <span>{field.label}</span>
                     <input
+                      ref={index === 0 ? firstFieldRef : undefined}
                       type={field.inputType ?? "text"}
                       value={fieldValues[field.id] ?? ""}
                       placeholder={field.inputPlaceholder}
+                      aria-invalid={Boolean(submitValidationMessage)}
+                      aria-describedby={
+                        submitValidationMessage
+                          ? "care-entry-validation"
+                          : undefined
+                      }
                       onChange={(event) =>
                         setFieldValues((current) => ({
                           ...current,
@@ -1833,9 +2336,15 @@ export function CareDashboard() {
               </div>
             ) : null}
 
+            {submitValidationMessage ? (
+              <div id="care-entry-validation" className="field-hint error">
+                {submitValidationMessage}
+              </div>
+            ) : null}
+
             <div className="sheet-footer">
               <PrimaryButton
-                disabled={submitting}
+                disabled={submitDisabled}
                 onClick={() => void handleSubmit()}
               >
                 {submitting

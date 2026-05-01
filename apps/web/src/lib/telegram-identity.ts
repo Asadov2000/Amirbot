@@ -32,17 +32,17 @@ export interface ClientActorContext {
   telegramUserId?: string;
 }
 
-const DAD_USERNAME = "yamob";
-const MOM_USERNAME = "manizha_u";
+const DAD_TELEGRAM_ID = "5328212518";
+const MOM_TELEGRAM_ID = "775978948";
 
 function actorFromUser(user?: TelegramWebAppUser): ActorId | null {
-  const username = user?.username?.trim().replace(/^@+/, "").toLowerCase();
+  const telegramUserId = user?.id ? String(user.id) : undefined;
 
-  if (username === DAD_USERNAME) {
+  if (telegramUserId === DAD_TELEGRAM_ID) {
     return "dad";
   }
 
-  if (username === MOM_USERNAME) {
+  if (telegramUserId === MOM_TELEGRAM_ID) {
     return "mom";
   }
 
@@ -98,11 +98,13 @@ export function resolveTelegramActor(): ClientActorContext | null {
 
   return {
     actor: actor ?? "mom",
-    locked: Boolean(actor),
+    locked: true,
     source: "telegram",
     displayName:
       actor === "dad" ? "Папа" : actor === "mom" ? "Мама" : "Проверяю доступ",
-    allowed: true,
+    // Telegram Desktop can expose raw initData before initDataUnsafe.user.
+    // In that case the server is the source of truth and will resolve the actor.
+    allowed: Boolean(actor || initData),
     telegramUserId: user?.id ? String(user.id) : undefined,
     initData,
   };

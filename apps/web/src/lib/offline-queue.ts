@@ -10,6 +10,16 @@ const SNAPSHOT_KEY = "amir.last-snapshot";
 const LOCAL_EVENTS_KEY = "amir.local-events";
 const PENDING_EVENTS_KEY = "amir.pending-events";
 const OVERRIDES_KEY = "amir.event-overrides";
+const CORRUPT_STORAGE_PREFIX = "amir.corrupt";
+const STORAGE_ERROR_MESSAGE =
+  "Не удалось сохранить запись на устройстве. Проверьте свободное место и настройки Telegram, затем повторите.";
+
+export class OfflineStorageError extends Error {
+  public constructor(message = STORAGE_ERROR_MESSAGE) {
+    super(message);
+    this.name = "OfflineStorageError";
+  }
+}
 
 export type PendingSyncOperation =
   | {
@@ -19,6 +29,8 @@ export type PendingSyncOperation =
       draft: EventDraft;
       localEvent: CareEventRecord;
       createdAt: string;
+      conflictedAt?: string;
+      lastError?: string;
     }
   | {
       id: string;
@@ -28,6 +40,8 @@ export type PendingSyncOperation =
       draft: EventDraft;
       localEvent: CareEventRecord;
       createdAt: string;
+      conflictedAt?: string;
+      lastError?: string;
     };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -35,28 +49,44 @@ function readJson<T>(key: string, fallback: T): T {
     return fallback;
   }
 
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      return fallback;
-    }
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return fallback;
+  }
 
+  try {
     return JSON.parse(raw) as T;
   } catch {
-    window.localStorage.removeItem(key);
+    try {
+      window.localStorage.setItem(
+        `${CORRUPT_STORAGE_PREFIX}.${key}.${Date.now()}`,
+        raw,
+      );
+      window.localStorage.removeItem(key);
+    } catch {
+      // Keep the broken value if it cannot be safely quarantined.
+    }
     return fallback;
   }
 }
 
-function writeJson<T>(key: string, value: T): void {
+function writeJson<T>(key: string, value: T): boolean {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // Telegram Desktop can keep broken storage entries between Mini App deploys.
+    return false;
+  }
+}
+
+function requireWriteJson<T>(key: string, value: T): void {
+  if (!writeJson(key, value)) {
+    throw new OfflineStorageError();
   }
 }
 
@@ -152,6 +182,9 @@ function isPendingSyncOperation(value: unknown): value is PendingSyncOperation {
     typeof value.id !== "string" ||
     typeof value.localEventId !== "string" ||
     typeof value.createdAt !== "string" ||
+    (value.conflictedAt !== undefined &&
+      typeof value.conflictedAt !== "string") ||
+    (value.lastError !== undefined && typeof value.lastError !== "string") ||
     !isEventDraft(value.draft) ||
     !isCareEventRecord(value.localEvent)
   ) {
@@ -310,7 +343,7 @@ export function enqueuePendingOperation(
       return true;
     }),
   ];
-  writeJson(PENDING_EVENTS_KEY, next);
+  requireWriteJson(PENDING_EVENTS_KEY, next);
   return next;
 }
 
@@ -320,6 +353,65 @@ export function removePendingOperation(
   const next = getPendingOperations().filter((item) => item.id !== operationId);
   writeJson(PENDING_EVENTS_KEY, next);
   return next;
+}
+
+function isSamePendingOperation(
+  current: PendingSyncOperation,
+  candidate: PendingSyncOperation,
+) {
+  return (
+    current.id === candidate.id &&
+    current.operation === candidate.operation &&
+    current.localEventId === candidate.localEventId &&
+    current.createdAt === candidate.createdAt &&
+    JSON.stringify(current.draft) === JSON.stringify(candidate.draft) &&
+    JSON.stringify(current.localEvent) === JSON.stringify(candidate.localEvent)
+  );
+}
+
+export function removePendingOperationIfUnchanged(
+  operation: PendingSyncOperation,
+): boolean {
+  let removed = false;
+  const next = getPendingOperations().filter((item) => {
+    if (item.id !== operation.id) {
+      return true;
+    }
+
+    if (isSamePendingOperation(item, operation)) {
+      removed = true;
+      return false;
+    }
+
+    return true;
+  });
+
+  if (removed && !writeJson(PENDING_EVENTS_KEY, next)) {
+    return false;
+  }
+
+  return removed;
+}
+
+export function markPendingOperationConflicted(
+  operation: PendingSyncOperation,
+  message: string,
+): PendingSyncOperation[] {
+  const next = getPendingOperations().map((item) =>
+    isSamePendingOperation(item, operation)
+      ? {
+          ...item,
+          conflictedAt: new Date().toISOString(),
+          lastError: message,
+        }
+      : item,
+  );
+  requireWriteJson(PENDING_EVENTS_KEY, next);
+  return next;
+}
+
+export function getPendingLocalEvents(): CareEventRecord[] {
+  return getPendingOperations().map((operation) => operation.localEvent);
 }
 
 export function getEventOverrides(): Record<string, Partial<CareEventRecord>> {

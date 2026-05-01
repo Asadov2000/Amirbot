@@ -38,6 +38,8 @@ export interface CareEventRecord {
   payload: Record<string, string | number | boolean | null>;
   status: EventStatus;
   editedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
   source: "server" | "local";
 }
 
@@ -104,6 +106,9 @@ export interface QuickItemRecord {
 
 export interface DashboardSnapshot {
   generatedAt: string;
+  snapshotVersion?: string;
+  syncVersion?: string;
+  lastSyncedAt?: string;
   child: ChildProfile;
   overview: OverviewCard;
   reminders: ReminderCard[];
