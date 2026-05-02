@@ -1083,10 +1083,22 @@ function toTimeInput(value: string): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function combineDateAndTime(baseIso: string, timeValue: string): string {
-  const base = new Date(baseIso);
+function combineDateAndTime(dateValue: string, timeValue: string): string {
+  const [year, month, day] = dateValue.split("-").map(Number);
   const [hours, minutes] = timeValue.split(":").map(Number);
-  base.setHours(hours, minutes, 0, 0);
+  const base = new Date();
+
+  if (year && month && day) {
+    base.setFullYear(year, month - 1, day);
+  }
+
+  base.setHours(
+    Number.isFinite(hours) ? hours : 0,
+    Number.isFinite(minutes) ? minutes : 0,
+    0,
+    0,
+  );
+
   return base.toISOString();
 }
 
@@ -1281,6 +1293,9 @@ export function CareDashboard() {
   const [timeValue, setTimeValue] = useState(
     toTimeInput(new Date().toISOString()),
   );
+  const [entryDateValue, setEntryDateValue] = useState(() =>
+    toDateInputValue(new Date()),
+  );
   const [sheetActor, setSheetActor] = useState<ActorId>("mom");
   const [editingEvent, setEditingEvent] = useState<CareEventRecord | null>(
     null,
@@ -1333,6 +1348,7 @@ export function CareDashboard() {
     setSelectedPresetId(preset?.id ?? "");
     setInputValue(preset?.defaultInput ?? "");
     setFieldValues(getDefaultFieldValues(preset));
+    setEntryDateValue(toDateInputValue(new Date()));
     setTimeValue(toTimeInput(new Date().toISOString()));
     setSheetActor(activeActor);
     setEditingEvent(null);
@@ -1355,6 +1371,7 @@ export function CareDashboard() {
       ...getDefaultFieldValues(preset),
       ...getEventFieldValues(event),
     });
+    setEntryDateValue(toDateInputValue(new Date(event.occurredAt)));
     setTimeValue(toTimeInput(event.occurredAt));
     setSheetActor(event.actor);
     setEditingEvent(event);
@@ -1427,10 +1444,7 @@ export function CareDashboard() {
     try {
       const draft = currentPreset.buildDraft({
         actor: editingEvent ? editingEvent.actor : sheetActor,
-        occurredAt: combineDateAndTime(
-          editingEvent?.occurredAt ?? new Date().toISOString(),
-          timeValue,
-        ),
+        occurredAt: combineDateAndTime(entryDateValue, timeValue),
         inputValue,
         fieldValues,
       });
@@ -2280,14 +2294,26 @@ export function CareDashboard() {
               ))}
             </div>
 
-            <label className="field">
-              <span>Время</span>
-              <input
-                type="time"
-                value={timeValue}
-                onChange={(event) => setTimeValue(event.target.value)}
-              />
-            </label>
+            <div className="field-grid entry-date-time-grid">
+              <label className="field">
+                <span>Дата</span>
+                <input
+                  type="date"
+                  value={entryDateValue}
+                  max={toDateInputValue(new Date())}
+                  onChange={(event) => setEntryDateValue(event.target.value)}
+                />
+              </label>
+
+              <label className="field">
+                <span>Время</span>
+                <input
+                  type="time"
+                  value={timeValue}
+                  onChange={(event) => setTimeValue(event.target.value)}
+                />
+              </label>
+            </div>
 
             {currentPreset.inputLabel ? (
               <label className="field">
