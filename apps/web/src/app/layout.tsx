@@ -1,21 +1,45 @@
 import type { Metadata, Viewport } from "next";
 import type { PropsWithChildren } from "react";
 
+import { InstallShortcutProvider } from "@/components/providers/install-shortcut-provider";
 import { ServiceWorkerProvider } from "@/components/providers/service-worker-provider";
 import { TelegramProvider } from "@/components/providers/telegram-provider";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Amir Care Mini App",
-  description:
-    "Семейный Telegram Mini App для родителей: кормления, сон, подгузники, температура и лекарства.",
+  metadataBase: new URL("https://amirbot-web.vercel.app"),
+  title: "Амир",
+  description: "Семейный журнал ухода за Амиром для мамы и папы.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Amir Care",
+    title: "Амир",
   },
-  applicationName: "Amir Care",
+  applicationName: "Амир",
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-title": "Амир",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
@@ -35,6 +59,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
       <body>
         <TelegramProvider />
         <ServiceWorkerProvider />
+        <InstallShortcutProvider />
         {children}
       </body>
     </html>

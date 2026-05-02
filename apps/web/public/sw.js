@@ -1,10 +1,19 @@
-const CACHE_NAME = "amir-care-v4";
-const FALLBACK_URLS = ["/", "/manifest.webmanifest"];
+const CACHE_NAME = "amir-care-v6";
+const APP_SHELL_URLS = [
+  "/",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/maskable-512.png",
+  "/icons/apple-touch-icon.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(FALLBACK_URLS);
+      return cache.addAll(APP_SHELL_URLS);
     }),
   );
   self.skipWaiting();
@@ -12,11 +21,15 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key)),
+        ),
       ),
-    ),
   );
   self.clients.claim();
 });
@@ -40,7 +53,12 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put("/", clone));
           return response;
         })
-        .catch(() => caches.match("/") || Response.error()),
+        .catch(
+          () =>
+            caches.match("/") ||
+            caches.match("/offline.html") ||
+            Response.error(),
+        ),
     );
     return;
   }
@@ -55,10 +73,16 @@ self.addEventListener("fetch", (event) => {
       .then((response) => {
         if (response.ok && requestUrl.pathname.startsWith("/_next/")) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, clone));
         }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || Response.error())),
+      .catch(() =>
+        caches
+          .match(event.request)
+          .then((cached) => cached || Response.error()),
+      ),
   );
 });
