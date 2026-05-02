@@ -46,7 +46,7 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const SYNC_STATE_INTERVAL_MS = 2_000;
-const FULL_SYNC_INTERVAL_MS = 20_000;
+const FULL_SYNC_INTERVAL_MS = 45_000;
 const SYNC_LOCK_KEY = "amir.sync-lock";
 const SYNC_PULSE_KEY = "amir.sync-pulse";
 const SYNC_LOCK_TTL_MS = 14_000;
@@ -294,6 +294,7 @@ export function useCareDashboard() {
   const [conflictCount, setConflictCount] = useState(0);
   const [online, setOnline] = useState(true);
   const [actorLocked, setActorLocked] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [actorDisplayName, setActorDisplayName] = useState("Мама");
   const [accessDenied, setAccessDenied] = useState(false);
   const [aiAnswer, setAiAnswer] = useState<string>("");
@@ -301,6 +302,7 @@ export function useCareDashboard() {
   const [lastSyncedAt, setLastSyncedAt] = useState<string>("");
   const syncInFlightRef = useRef(false);
   const latestSyncVersionRef = useRef<string | null>(null);
+  const realtimeConnectedRef = useRef(false);
 
   const updatePendingCounters = () => {
     const pendingOperations = getPendingOperations();
@@ -348,6 +350,7 @@ export function useCareDashboard() {
         startTransition(() => {
           setAccessDenied(true);
           setActorLocked(true);
+          setSessionReady(false);
           setActorDisplayName("Нет доступа");
           updatePendingCounters();
           setError(error.message);
@@ -408,6 +411,7 @@ export function useCareDashboard() {
       setActorDisplayName(response.displayName);
       setStoredActor(response.actor);
       setAccessDenied(false);
+      setSessionReady(true);
       setError("");
     });
 
@@ -558,25 +562,80 @@ export function useCareDashboard() {
       },
     );
 
-    if (latestSyncVersionRef.current === null) {
-      latestSyncVersionRef.current = state.syncVersion;
-      await refreshSnapshot(false);
-      return;
-    }
-
-    if (state.syncVersion !== latestSyncVersionRef.current) {
-      await refreshSnapshot(false);
-      return;
-    }
-
-    updatePendingCounters();
-    setLastSyncedAt(new Date().toISOString());
-    setError("");
+    await applyRemoteSyncState(state);
   });
+
+  const applyRemoteSyncState = useEffectEvent(
+    async (state: SyncStateResponse) => {
+      if (!state.syncVersion) {
+        return;
+      }
+
+      if (latestSyncVersionRef.current === null) {
+        latestSyncVersionRef.current = state.syncVersion;
+        await refreshSnapshot(false);
+        return;
+      }
+
+      if (state.syncVersion !== latestSyncVersionRef.current) {
+        latestSyncVersionRef.current = state.syncVersion;
+        await refreshSnapshot(false);
+        return;
+      }
+
+      updatePendingCounters();
+      setLastSyncedAt(state.generatedAt ?? new Date().toISOString());
+      setError("");
+    },
+  );
+
+  useEffect(() => {
+    if (
+      accessDenied ||
+      !actorLocked ||
+      !sessionReady ||
+      isLocalBrowser() ||
+      typeof EventSource === "undefined"
+    ) {
+      realtimeConnectedRef.current = false;
+      return;
+    }
+
+    const source = new EventSource(`/api/sync/stream?ts=${Date.now()}`);
+
+    source.onopen = () => {
+      realtimeConnectedRef.current = true;
+    };
+
+    source.onerror = () => {
+      realtimeConnectedRef.current = false;
+    };
+
+    source.addEventListener("sync", (event) => {
+      const message = event as MessageEvent<string>;
+      try {
+        const state = JSON.parse(message.data) as SyncStateResponse;
+        void applyRemoteSyncState(state).catch(() => {
+          updatePendingCounters();
+        });
+      } catch {
+        updatePendingCounters();
+      }
+    });
+
+    return () => {
+      realtimeConnectedRef.current = false;
+      source.close();
+    };
+  }, [accessDenied, actorLocked, sessionReady]);
 
   useEffect(() => {
     const syncNow = () => {
       if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      if (realtimeConnectedRef.current) {
         return;
       }
 
@@ -625,6 +684,7 @@ export function useCareDashboard() {
 
     setActiveActor(storedActor);
     setActorLocked(false);
+    setSessionReady(false);
     setActorDisplayName(storedActor === "dad" ? "Папа" : "Мама");
     setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
 
@@ -652,10 +712,22 @@ export function useCareDashboard() {
         }
 
         if (!isLocalBrowser()) {
-          setAccessDenied(true);
-          setActorLocked(true);
-          setActorDisplayName("Нет доступа");
-          setError("Откройте приложение через Telegram аккаунт мамы или папы.");
+          void refreshSession()
+            .then(async () => {
+              await refreshSnapshot(false);
+              await syncPendingEvents();
+              await refreshSnapshot(false);
+              void refreshAi();
+            })
+            .catch(() => {
+              setAccessDenied(true);
+              setActorLocked(true);
+              setSessionReady(false);
+              setActorDisplayName("Нет доступа");
+              setError(
+                "Откройте приложение через Telegram аккаунт мамы или папы.",
+              );
+            });
           return;
         }
 
@@ -667,6 +739,7 @@ export function useCareDashboard() {
       if (!telegramActor.allowed) {
         setAccessDenied(true);
         setActorLocked(true);
+        setSessionReady(false);
         setActorDisplayName("Нет доступа");
         setError("Доступ открыт только маме и папе Амира.");
         return;
@@ -693,6 +766,7 @@ export function useCareDashboard() {
         .catch((error) => {
           setAccessDenied(true);
           setActorLocked(true);
+          setSessionReady(false);
           setActorDisplayName("Нет доступа");
           setError(
             error instanceof Error
