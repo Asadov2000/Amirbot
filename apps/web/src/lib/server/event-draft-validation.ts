@@ -9,6 +9,8 @@ const EVENT_KINDS = new Set([
   "TEMPERATURE",
   "MEDICATION",
   "GROWTH",
+  "WALK",
+  "BATH",
   "NOTE",
 ]);
 const STATUSES = new Set(["LOGGED", "STARTED", "COMPLETED"]);
@@ -97,7 +99,7 @@ function validateSemanticPayload(kind: string, payload: EventDraft["payload"]) {
       return;
     }
 
-    if (payload.mode === "BOTTLE") {
+    if (payload.mode === "BOTTLE" || payload.mode === "BREAST_BOTTLE") {
       const volumeMl = payloadNumber(payload, "volumeMl");
       if (!volumeMl || volumeMl < 1 || volumeMl > 500) {
         throw new ApiError(
@@ -139,6 +141,32 @@ function validateSemanticPayload(kind: string, payload: EventDraft["payload"]) {
       400,
       "Некорректная запись сна.",
     );
+  }
+
+  if (
+    kind === "WALK" &&
+    payload.phase !== "START" &&
+    payload.phase !== "END"
+  ) {
+    throw new ApiError(
+      "Walk phase is invalid",
+      400,
+      "Некорректная запись прогулки.",
+    );
+  }
+
+  if (kind === "BATH") {
+    const durationMinutes = payloadNumber(payload, "durationMinutes");
+    if (
+      durationMinutes !== null &&
+      (durationMinutes < 1 || durationMinutes > 120)
+    ) {
+      throw new ApiError(
+        "Bath duration is invalid",
+        400,
+        "Некорректная длительность купания.",
+      );
+    }
   }
 
   if (kind === "TEMPERATURE") {

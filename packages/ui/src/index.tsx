@@ -482,6 +482,15 @@ export function BottomTabs({
       aria-label="Основная навигация"
       className="bottom-tabs-shell"
       style={{
+        // Позиционирование захардкодено здесь, потому что Turbopack
+        // в dev-режиме нестабильно вырезает position/left/bottom/transform
+        // из CSS-чанка при некоторых рекомпиляциях.
+        position: "fixed",
+        left: "50%",
+        bottom: "calc(max(14px, env(safe-area-inset-bottom)) + 6px)",
+        transform: "translateX(-50%)",
+        zIndex: 80,
+        width: "min(calc(100vw - 24px), 720px)",
         display: "grid",
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
       }}

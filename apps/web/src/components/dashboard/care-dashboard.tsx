@@ -12,13 +12,12 @@ import {
   Pill,
   PrimaryButton,
   SectionTitle,
-  StatTile,
   Surface,
-  TimelineItem,
 } from "@amir/ui";
 
 import {
   actorLabel,
+  calculateAgeBreakdown,
   formatDateTime,
   formatDuration,
   formatTime,
@@ -46,7 +45,9 @@ type ActionId =
   | "medication"
   | "temperature"
   | "note"
-  | "growth";
+  | "growth"
+  | "walk"
+  | "bath";
 type FeedKindFilter = CareEventKind | "ALL";
 type ActorFilter = ActorId | "ALL";
 
@@ -102,11 +103,11 @@ interface GrowthReading {
 type GrowthMetricKey = "weightKg" | "heightCm";
 
 const tabs = [
-  { id: "home", label: "Главная", icon: "◉" },
-  { id: "log", label: "Запись", icon: "＋" },
-  { id: "feed", label: "Лента", icon: "≋" },
-  { id: "summary", label: "Итоги", icon: "◫" },
-  { id: "export", label: "Отчёт", icon: "⇩" },
+  { id: "home", label: "Главная", icon: "🏠" },
+  { id: "log", label: "Запись", icon: "✚" },
+  { id: "feed", label: "Лента", icon: "☰" },
+  { id: "summary", label: "Итоги", icon: "▦" },
+  { id: "export", label: "Отчёт", icon: "↓" },
 ] satisfies Array<{ id: TabId; label: string; icon: string }>;
 
 const kindFilterOptions: Array<{ id: FeedKindFilter; label: string }> = [
@@ -115,6 +116,8 @@ const kindFilterOptions: Array<{ id: FeedKindFilter; label: string }> = [
   { id: "DIAPER", label: "Подгузник" },
   { id: "SOLID_FOOD", label: "Прикорм" },
   { id: "SLEEP", label: "Сон" },
+  { id: "WALK", label: "Прогулка" },
+  { id: "BATH", label: "Купание" },
   { id: "MEDICATION", label: "Лекарства" },
   { id: "TEMPERATURE", label: "Температура" },
   { id: "GROWTH", label: "Вес/рост" },
@@ -133,7 +136,7 @@ const actions: ActionDefinition[] = [
     kind: "FEEDING",
     icon: "🍼",
     title: "Кормление",
-    subtitle: "Грудь или бутылочка",
+    subtitle: "Грудь, бутылочка или сцеженное молоко",
     presets: [
       {
         id: "breast",
@@ -144,7 +147,7 @@ const actions: ActionDefinition[] = [
         inputType: "number",
         hiddenForActors: ["dad"],
         buildDraft: ({ actor, occurredAt, inputValue }) => {
-          const durationMinutes = Number(inputValue || 18);
+          const durationMinutes = parseNumber(inputValue, 18);
           return {
             kind: "FEEDING",
             actor,
@@ -156,19 +159,38 @@ const actions: ActionDefinition[] = [
         },
       },
       {
+        id: "breast_bottle",
+        label: "Сцеженное молоко",
+        helper: "Грудное молоко в бутылочке",
+        defaultInput: "100",
+        inputLabel: "Миллилитры",
+        inputType: "number",
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const volumeMl = parseNumber(inputValue, 100);
+          return {
+            kind: "FEEDING",
+            actor,
+            occurredAt,
+            summary: `Сцеженное молоко — ${volumeMl} мл`,
+            payload: { mode: "BREAST_BOTTLE", volumeMl },
+            status: "COMPLETED",
+          };
+        },
+      },
+      {
         id: "bottle",
-        label: "Бутылочка",
+        label: "Смесь",
         helper: "По умолчанию 120 мл",
         defaultInput: "120",
         inputLabel: "Миллилитры",
         inputType: "number",
         buildDraft: ({ actor, occurredAt, inputValue }) => {
-          const volumeMl = Number(inputValue || 120);
+          const volumeMl = parseNumber(inputValue, 120);
           return {
             kind: "FEEDING",
             actor,
             occurredAt,
-            summary: `Бутылочка — ${volumeMl} мл`,
+            summary: `Смесь — ${volumeMl} мл`,
             payload: { mode: "BOTTLE", volumeMl },
             status: "COMPLETED",
           };
@@ -216,44 +238,44 @@ const actions: ActionDefinition[] = [
     kind: "DIAPER",
     icon: "🧷",
     title: "Подгузник",
-    subtitle: "Пописал, покакал или всё вместе",
+    subtitle: "Что было и сменили ли подгузник",
     presets: [
       {
         id: "wet",
         label: "Пописал",
-        helper: "Быстрая отметка подгузника",
+        helper: "",
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "DIAPER",
           actor,
           occurredAt,
-          summary: "Подгузник — пописал",
-          payload: { type: "WET" },
+          summary: "Сменили подгузник — пописал",
+          payload: { type: "WET", changed: true },
           status: "LOGGED",
         }),
       },
       {
         id: "dirty",
         label: "Покакал",
-        helper: "Отдельная отметка стула",
+        helper: "",
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "DIAPER",
           actor,
           occurredAt,
-          summary: "Подгузник — покакал",
-          payload: { type: "DIRTY" },
+          summary: "Сменили подгузник — покакал",
+          payload: { type: "DIRTY", changed: true },
           status: "LOGGED",
         }),
       },
       {
         id: "mixed",
         label: "Пописал и покакал",
-        helper: "Одна отметка для смешанного подгузника",
+        helper: "",
         buildDraft: ({ actor, occurredAt }) => ({
           kind: "DIAPER",
           actor,
           occurredAt,
-          summary: "Подгузник — пописал и покакал",
-          payload: { type: "MIXED" },
+          summary: "Сменили подгузник — пописал и покакал",
+          payload: { type: "MIXED", changed: true },
           status: "LOGGED",
         }),
       },
@@ -274,7 +296,7 @@ const actions: ActionDefinition[] = [
         inputLabel: "°C",
         inputType: "number",
         buildDraft: ({ actor, occurredAt, inputValue }) => {
-          const temperatureC = Number(inputValue || 36.8);
+          const temperatureC = parseNumber(inputValue, 36.8);
           return {
             kind: "TEMPERATURE",
             actor,
@@ -439,17 +461,101 @@ const actions: ActionDefinition[] = [
       },
     ],
   },
+  {
+    id: "walk",
+    kind: "WALK",
+    icon: "🌳",
+    title: "Прогулка",
+    subtitle: "Старт и финиш — длительность считается сама",
+    presets: [
+      {
+        id: "walk_start",
+        label: "Начали прогулку",
+        helper: "",
+        buildDraft: ({ actor, occurredAt }) => ({
+          kind: "WALK",
+          actor,
+          occurredAt,
+          summary: "Прогулка началась",
+          payload: { phase: "START" },
+          status: "STARTED",
+        }),
+      },
+      {
+        id: "walk_end",
+        label: "Закончили прогулку",
+        helper: "",
+        buildDraft: ({ actor, occurredAt }) => ({
+          kind: "WALK",
+          actor,
+          occurredAt,
+          summary: "Прогулка завершена",
+          payload: { phase: "END" },
+          status: "COMPLETED",
+        }),
+      },
+      {
+        id: "walk_manual",
+        label: "Записать вручную",
+        helper: "",
+        defaultInput: "30",
+        inputLabel: "Минуты",
+        inputType: "number",
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const durationMinutes = Math.max(1, Math.round(parseNumber(inputValue, 30)));
+          return {
+            kind: "WALK",
+            actor,
+            occurredAt,
+            summary: `Прогулка — ${durationMinutes} мин`,
+            payload: { phase: "END", durationMinutes },
+            status: "COMPLETED",
+          };
+        },
+      },
+    ],
+  },
+  {
+    id: "bath",
+    kind: "BATH",
+    icon: "🛁",
+    title: "Купание",
+    subtitle: "Сколько минут было купание",
+    presets: [
+      {
+        id: "bath",
+        label: "Записать купание",
+        helper: "По умолчанию 10 минут",
+        defaultInput: "10",
+        inputLabel: "Минуты",
+        inputType: "number",
+        buildDraft: ({ actor, occurredAt, inputValue }) => {
+          const durationMinutes = Math.max(1, Math.round(parseNumber(inputValue, 10)));
+          return {
+            kind: "BATH",
+            actor,
+            occurredAt,
+            summary: `Купание — ${durationMinutes} мин`,
+            payload: { durationMinutes },
+            status: "LOGGED",
+          };
+        },
+      },
+    ],
+  },
 ];
 
 const actionOrder: ActionId[] = [
   "feeding",
   "diaper",
-  "solid_food",
   "sleep",
-  "medication",
+  "walk",
   "temperature",
-  "note",
+  "solid_food",
+  "bath",
+  "medication",
   "growth",
+  "note",
 ];
 const orderedActions = actionOrder
   .map((id) => actions.find((action) => action.id === id))
@@ -488,6 +594,63 @@ function getEventFieldValues(event: CareEventRecord): Record<string, string> {
 
 function isFiniteNumericInput(value: string) {
   return Number.isFinite(Number(value.trim().replace(",", ".")));
+}
+
+/** Безопасно парсит число с поддержкой запятой; возвращает fallback на NaN/пусто. */
+function parseNumber(value: string | undefined, fallback: number): number {
+  const text = (value ?? "").trim().replace(",", ".");
+  if (!text) return fallback;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
+ * Шаг и форматирование stepper-кнопок для числового ввода в форме.
+ * Подбирается так, чтобы один тап давал осмысленную дельту:
+ * температура — 0.1°, мл — 10, минуты — 5, остальное — 1.
+ */
+function getStepperConfig(
+  action: ActionDefinition | undefined,
+  preset: ActionPreset | undefined,
+): {
+  step: number;
+  min: number;
+  max: number;
+  precision: number;
+} | null {
+  if (!action || !preset || preset.inputType !== "number") return null;
+  if (action.id === "temperature") {
+    return { step: 0.1, min: 30, max: 43, precision: 1 };
+  }
+  if (action.id === "feeding" && preset.id === "breast") {
+    // длительность кормления в минутах
+    return { step: 5, min: 1, max: 180, precision: 0 };
+  }
+  if (action.id === "feeding") {
+    // мл бутылочки/сцеженное
+    return { step: 10, min: 1, max: 500, precision: 0 };
+  }
+  if (action.id === "walk" || action.id === "bath") {
+    return { step: 5, min: 1, max: 240, precision: 0 };
+  }
+  return { step: 1, min: 0, max: 9999, precision: 1 };
+}
+
+/** Применяет дельту к числовому значению input'а с учётом точности и границ. */
+function applyStepperDelta(
+  current: string,
+  delta: number,
+  config: { step: number; min: number; max: number; precision: number },
+  fallback: number,
+): string {
+  const value = parseNumber(current, fallback);
+  const next = Math.min(
+    config.max,
+    Math.max(config.min, value + delta * config.step),
+  );
+  return config.precision === 0
+    ? String(Math.round(next))
+    : next.toFixed(config.precision).replace(/\.?0+$/, "");
 }
 
 function getSubmitValidationMessage(
@@ -545,6 +708,10 @@ function eventKindLabel(kind: CareEventKind): string {
       return "Лекарство";
     case "GROWTH":
       return "Вес и рост";
+    case "WALK":
+      return "Прогулка";
+    case "BATH":
+      return "Купание";
     case "NOTE":
     default:
       return "Заметка";
@@ -555,11 +722,34 @@ function eventIcon(kind: CareEventKind): string {
   return actions.find((action) => action.kind === kind)?.icon ?? "•";
 }
 
+const TZ_MOSCOW = "Europe/Moscow";
+
+/** Достаёт численные части даты в часовом поясе Москвы. */
+function moscowParts(date: Date): { year: number; month: number; day: number } {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_MOSCOW,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  // en-CA → "YYYY-MM-DD"
+  const [year, month, day] = fmt.format(date).split("-").map(Number);
+  return { year, month, day };
+}
+
+/** Начало дня (00:00) в Москве для произвольной даты. */
+function moscowStartOfDay(date: Date): Date {
+  const { year, month, day } = moscowParts(date);
+  // 00:00 МСК = 21:00 предыдущих суток UTC (UTC+3)
+  return new Date(Date.UTC(year, month - 1, day, -3, 0, 0, 0));
+}
+
 function dayKey(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    timeZone: TZ_MOSCOW,
   }).format(new Date(value));
 }
 
@@ -568,25 +758,24 @@ function dayTitle(value: string): string {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: TZ_MOSCOW,
   }).format(new Date(value));
 }
 
+/** Преобразует Date в значение для <input type="date"> по дате в МСК. */
 function toDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const { year, month, day } = moscowParts(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Конец дня (23:59:59.999) в Москве. */
 function dateInputToDayEnd(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) {
-    const fallback = new Date();
-    fallback.setHours(23, 59, 59, 999);
-    return fallback;
+    return moscowStartOfDay(new Date());
   }
-
-  return new Date(year, month - 1, day, 23, 59, 59, 999);
+  // 23:59:59.999 МСК = 20:59:59.999 UTC
+  return new Date(Date.UTC(year, month - 1, day, 20, 59, 59, 999));
 }
 
 function dateInputToLabel(value: string): string {
@@ -594,6 +783,7 @@ function dateInputToLabel(value: string): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: TZ_MOSCOW,
   }).format(dateInputToDayEnd(value));
 }
 
@@ -606,10 +796,14 @@ function periodRangeStart(days: number | null, value: string): number {
     return Number.NEGATIVE_INFINITY;
   }
 
-  const end = dateInputToDayEnd(value);
-  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  start.setDate(start.getDate() - days + 1);
-  return start.getTime();
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  // Старт окна = 00:00 МСК даты (end - days + 1)
+  // 00:00 МСК = -3:00 UTC того же дня
+  const endDayStartUTC = Date.UTC(year, month - 1, day, -3, 0, 0, 0);
+  return endDayStartUTC - (days - 1) * 86_400_000;
 }
 
 function buildSummaryForDate(
@@ -671,9 +865,40 @@ function buildSummaryForDate(
     );
   }
 
+  const walkEvents = periodEvents.filter((event) => event.kind === "WALK");
+  const bathEvents = periodEvents.filter((event) => event.kind === "BATH");
+  const totalWalkMinutes = sumWalkMinutes(walkEvents, end);
+  const totalBathMinutes = bathEvents.reduce(
+    (sum, event) =>
+      sum + Math.max(0, Number(event.payload.durationMinutes ?? 0)),
+    0,
+  );
+  const feedingsTotalMl = feedingEvents.reduce((sum, event) => {
+    const volume = Number(event.payload.volumeMl ?? 0);
+    return sum + (Number.isFinite(volume) ? volume : 0);
+  }, 0);
+  const breastFeedingCount = feedingEvents.filter(
+    (event) => event.payload.mode === "BREAST",
+  ).length;
+  const bottleFeedingCount = feedingEvents.filter(
+    (event) =>
+      event.payload.mode === "BOTTLE" || event.payload.mode === "BREAST_BOTTLE",
+  ).length;
+  const breastMilkBottleCount = feedingEvents.filter(
+    (event) => event.payload.mode === "BREAST_BOTTLE",
+  ).length;
+  const diaperChangedCount = diaperEvents.filter(
+    (event) => event.payload.changed !== false,
+  ).length;
+  const diaperCheckedOnlyCount = diaperEvents.length - diaperChangedCount;
+
   const summary: DailySummary = {
     dateLabel: dateInputToLabel(dateValue),
     feedingsCount: feedingEvents.length,
+    feedingsTotalMl: Math.round(feedingsTotalMl),
+    feedingsBreastCount: breastFeedingCount,
+    feedingsBottleCount: bottleFeedingCount,
+    feedingsBreastMilkBottleCount: breastMilkBottleCount,
     solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD")
       .length,
     totalSleepMinutes,
@@ -681,6 +906,8 @@ function buildSummaryForDate(
       feedingEvents.length > 1
         ? Math.round(intervalSum / (feedingEvents.length - 1))
         : 0,
+    diaperChangedCount,
+    diaperCheckedOnlyCount,
     diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET")
       .length,
     diaperDirtyCount: diaperEvents.filter(
@@ -697,6 +924,12 @@ function buildSummaryForDate(
     ).length,
     growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH")
       .length,
+    walkSessionsCount: walkEvents.filter(
+      (event) => event.payload.phase === "END",
+    ).length,
+    totalWalkMinutes,
+    bathSessionsCount: bathEvents.length,
+    totalBathMinutes,
   };
 
   return {
@@ -705,6 +938,62 @@ function buildSummaryForDate(
     title: period.title,
     days: period.days,
   };
+}
+
+/** Считает минуты прогулок по парам START/END в пределах окна периода. */
+function sumWalkMinutes(events: CareEventRecord[], periodEnd: number): number {
+  const starts = events
+    .filter((event) => event.payload.phase === "START")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+  const ends = events
+    .filter((event) => event.payload.phase === "END")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+
+  let total = 0;
+  starts.forEach((startEvent, index) => {
+    const endEvent = ends[index];
+    const endTime = endEvent
+      ? new Date(endEvent.occurredAt).getTime()
+      : Math.min(Date.now(), periodEnd);
+    total += Math.max(
+      0,
+      Math.round(
+        (endTime - new Date(startEvent.occurredAt).getTime()) / 60000,
+      ),
+    );
+  });
+
+  // События с уже посчитанной длительностью (ручной ввод "Записать вручную")
+  events
+    .filter(
+      (event) =>
+        event.payload.phase !== "START" &&
+        Number(event.payload.durationMinutes ?? 0) > 0,
+    )
+    .forEach((event) => {
+      // если это END с durationMinutes — длительность уже посчитана через пары,
+      // поэтому такие события не дублируем
+      const isPairedEnd =
+        event.payload.phase === "END" &&
+        starts.some(
+          (start, index) =>
+            ends[index] && ends[index].id === event.id,
+        );
+      if (isPairedEnd) {
+        return;
+      }
+      total += Math.max(0, Number(event.payload.durationMinutes ?? 0));
+    });
+
+  return total;
 }
 
 function getNumberPayload(
@@ -789,10 +1078,20 @@ function growthMetricValues(readings: GrowthReading[], key: GrowthMetricKey) {
     );
 }
 
+// Размеры SVG-чарта для GrowthMetricPanel.
+// Используем общие константы, чтобы tooltip и оси были выровнены идеально.
+const GROWTH_CHART = {
+  width: 320,
+  height: 160,
+  padX: 22,
+  padTop: 18,
+  padBottom: 32,
+} as const;
+
 function growthSeriesPoints(
   readings: GrowthReading[],
   key: GrowthMetricKey,
-): Array<{ x: number; y: number; value: number; label: string }> {
+): Array<{ x: number; y: number; value: number; label: string; occurredAt: string }> {
   const metricValues = growthMetricValues(readings, key);
   const values = metricValues.map((item) => item.value);
 
@@ -802,19 +1101,100 @@ function growthSeriesPoints(
 
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const width = 320;
-  const height = 126;
-  const pad = 18;
-  const range = max - min || 1;
+  const { width, height, padX, padTop, padBottom } = GROWTH_CHART;
+  // Если все значения равны — даём искусственный «диапазон» 4%, чтобы линия
+  // не липла к верхней границе и читалась горизонтально по центру.
+  const range = max - min || Math.max(0.01, max * 0.04);
+  // Если все значения равны, показываем линию по центру высоты:
+  const allEqual = max === min;
 
   return metricValues.map((reading, index) => {
     const x =
       metricValues.length === 1
         ? width / 2
-        : pad + (index / (metricValues.length - 1)) * (width - pad * 2);
-    const y = pad + (1 - (reading.value - min) / range) * (height - pad * 2);
-    return { x, y, value: reading.value, label: reading.label };
+        : padX + (index / (metricValues.length - 1)) * (width - padX * 2);
+    const innerH = height - padTop - padBottom;
+    const y = allEqual
+      ? padTop + innerH / 2
+      : padTop + (1 - (reading.value - min) / range) * innerH;
+    return {
+      x,
+      y,
+      value: reading.value,
+      label: reading.label,
+      occurredAt: reading.occurredAt,
+    };
   });
+}
+
+/**
+ * Строит smooth (Catmull-Rom → bezier) SVG-path по массиву точек.
+ * Tension 0.5 — плавно, без overshoot. Используется для линии графика.
+ */
+function buildSmoothPath(
+  points: Array<{ x: number; y: number }>,
+  tension = 0.5,
+): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+  if (points.length === 2) {
+    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  }
+  const t = tension / 6;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) * t;
+    const cp1y = p1.y + (p2.y - p0.y) * t;
+    const cp2x = p2.x - (p3.x - p1.x) * t;
+    const cp2y = p2.y - (p3.y - p1.y) * t;
+    d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+function buildAreaPath(
+  points: Array<{ x: number; y: number }>,
+  baselineY: number,
+  tension = 0.5,
+): string {
+  if (points.length === 0) return "";
+  const top = buildSmoothPath(points, tension);
+  return `${top} L ${points.at(-1)!.x} ${baselineY} L ${points[0].x} ${baselineY} Z`;
+}
+
+/** Форматирует период между первым и последним замером в человеко-читаемый текст. */
+function formatGrowthSpan(readings: GrowthReading[]): string {
+  if (readings.length < 2) return "";
+  const first = new Date(readings[0].occurredAt).getTime();
+  const last = new Date(readings.at(-1)!.occurredAt).getTime();
+  const days = Math.max(1, Math.round((last - first) / 86_400_000));
+  if (days < 14) return `за ${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 8) return `за ${weeks} ${weeks === 1 ? "неделю" : weeks < 5 ? "недели" : "недель"}`;
+  const months = Math.round(days / 30);
+  return `за ${months} ${months === 1 ? "месяц" : months < 5 ? "месяца" : "месяцев"}`;
+}
+
+/** Период фильтра графика. */
+type GrowthRange = "7d" | "30d" | "all";
+
+function filterGrowthByRange(
+  readings: GrowthReading[],
+  range: GrowthRange,
+): GrowthReading[] {
+  if (range === "all") return readings;
+  const now = Date.now();
+  const days = range === "7d" ? 7 : 30;
+  const start = now - days * 86_400_000;
+  return readings.filter(
+    (reading) => new Date(reading.occurredAt).getTime() >= start,
+  );
 }
 
 function GrowthMetricPanel({
@@ -835,55 +1215,280 @@ function GrowthMetricPanel({
     ? Math.max(...values.map((item) => item.value))
     : null;
   const points = growthSeriesPoints(readings, metricKey);
-  const path = points.map((point) => `${point.x},${point.y}`).join(" ");
   const tone = metricKey === "weightKg" ? "weight" : "height";
   const title = growthMetricLabel(metricKey);
+  const { width, height, padTop, padBottom, padX } = GROWTH_CHART;
+  const baselineY = height - padBottom;
+  // Smooth bezier-path и area-fill
+  const linePath = buildSmoothPath(points);
+  const areaPath = buildAreaPath(points, baselineY);
+  // Активная точка — по умолчанию последняя; меняется при hover/touch.
+  const [activeIndex, setActiveIndex] = useState<number>(
+    points.length ? points.length - 1 : 0,
+  );
+  // При смене readings (например, после переключения периода) вернёмся
+  // к последней точке.
+  useEffect(() => {
+    if (points.length === 0) return;
+    setActiveIndex(points.length - 1);
+    // Зависим только от длины серии, чтобы не скакать при ре-рендерах
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.length, metricKey]);
+
+  const trend =
+    delta === null
+      ? "neutral"
+      : Math.abs(delta) < 0.01
+        ? "neutral"
+        : delta > 0
+          ? "up"
+          : "down";
+
+  const activePoint = points[activeIndex] ?? points.at(-1) ?? null;
+
+  /**
+   * Конвертирует горизонтальную координату курсора/тача в индекс
+   * ближайшей точки серии. Используется для interactive scrubbing.
+   */
+  const handleScrub = (clientX: number, svg: SVGSVGElement) => {
+    if (!points.length) return;
+    const rect = svg.getBoundingClientRect();
+    const ratio = (clientX - rect.left) / rect.width;
+    const svgX = Math.max(0, Math.min(width, ratio * width));
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    points.forEach((point, idx) => {
+      const dist = Math.abs(point.x - svgX);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = idx;
+      }
+    });
+    setActiveIndex(bestIdx);
+  };
+
+  // Подписи Y-оси: max сверху, средний посередине, min снизу
+  const yMaxY = padTop;
+  const yMidY = padTop + (height - padTop - padBottom) / 2;
+  const yMinY = baselineY;
+
+  // Tooltip позиционируется относительно activePoint, но не вылезает за края.
+  const tooltipPositionLeft = activePoint
+    ? Math.max(8, Math.min(width - 8, activePoint.x))
+    : width / 2;
 
   return (
     <Surface className={`growth-panel growth-panel-${tone}`}>
       <div className="growth-panel-head">
-        <div>
+        <div className="growth-panel-headline">
           <div className="growth-panel-label">{title}</div>
           <div className="growth-panel-value">
             {formatGrowthValue(latest?.value ?? null, metricKey)}
           </div>
+          {values.length ? (
+            <div className={`growth-panel-trend trend-${trend}`}>
+              <span aria-hidden="true">
+                {trend === "up" ? "↗" : trend === "down" ? "↘" : "→"}
+              </span>
+              <span>{formatGrowthDelta(delta, metricKey)}</span>
+              {previous ? (
+                <span className="growth-panel-trend-meta">
+                  с {previous.label}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        <Pill>{latest?.label ?? "нет"}</Pill>
+        {values.length ? (
+          <div className="growth-panel-extremes" aria-hidden="true">
+            <span className="growth-panel-extreme">
+              <span>min</span>
+              <strong>{formatGrowthValue(min, metricKey)}</strong>
+            </span>
+            <span className="growth-panel-extreme">
+              <span>max</span>
+              <strong>{formatGrowthValue(max, metricKey)}</strong>
+            </span>
+          </div>
+        ) : null}
       </div>
       {values.length ? (
         <>
-          <div className="growth-panel-meta">
-            <span>{formatGrowthDelta(delta, metricKey)}</span>
-            <span>
-              {formatGrowthValue(min, metricKey)} -{" "}
-              {formatGrowthValue(max, metricKey)}
-            </span>
-          </div>
-          <div className="growth-mini-chart-wrap">
+          <div className="growth-chart-stage">
             <svg
-              className="growth-mini-chart"
-              viewBox="0 0 320 126"
+              className="growth-chart-svg"
+              viewBox={`0 0 ${width} ${height}`}
+              preserveAspectRatio="none"
               role="img"
               aria-label={`${title}: ${formatGrowthValue(latest?.value ?? null, metricKey)}`}
+              onPointerMove={(event) => {
+                if (event.pointerType === "mouse" && event.buttons === 0) {
+                  handleScrub(event.clientX, event.currentTarget);
+                }
+              }}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                handleScrub(event.clientX, event.currentTarget);
+              }}
+              onPointerLeave={() => {
+                if (points.length) setActiveIndex(points.length - 1);
+              }}
             >
-              <line x1="16" y1="16" x2="304" y2="16" />
-              <line x1="16" y1="63" x2="304" y2="63" />
-              <line x1="16" y1="110" x2="304" y2="110" />
-              {points.length > 1 ? <polyline points={path} /> : null}
-              {points.map((point) => (
+              <defs>
+                <linearGradient
+                  id={`growth-fill-${tone}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="currentColor"
+                    stopOpacity="0.42"
+                  />
+                  <stop
+                    offset="60%"
+                    stopColor="currentColor"
+                    stopOpacity="0.10"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="currentColor"
+                    stopOpacity="0"
+                  />
+                </linearGradient>
+                <linearGradient
+                  id={`growth-line-${tone}`}
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="0"
+                >
+                  <stop offset="0%" stopColor="currentColor" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="currentColor" stopOpacity="1" />
+                </linearGradient>
+                <filter
+                  id={`growth-glow-${tone}`}
+                  x="-20%"
+                  y="-20%"
+                  width="140%"
+                  height="140%"
+                >
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* Y-axis labels: max / mid / min */}
+              <g className="growth-chart-yaxis" aria-hidden="true">
+                <text x={padX - 6} y={yMaxY + 4} textAnchor="end">
+                  {formatGrowthValue(max, metricKey)}
+                </text>
+                {max !== min ? (
+                  <text x={padX - 6} y={yMidY + 4} textAnchor="end">
+                    {formatGrowthValue(
+                      ((max ?? 0) + (min ?? 0)) / 2,
+                      metricKey,
+                    )}
+                  </text>
+                ) : null}
+                <text x={padX - 6} y={yMinY + 4} textAnchor="end">
+                  {formatGrowthValue(min, metricKey)}
+                </text>
+              </g>
+
+              {/* Horizontal grid */}
+              <g className="growth-chart-grid" aria-hidden="true">
+                <line x1={padX} y1={yMaxY} x2={width - padX} y2={yMaxY} />
+                {max !== min ? (
+                  <line x1={padX} y1={yMidY} x2={width - padX} y2={yMidY} />
+                ) : null}
+                <line x1={padX} y1={yMinY} x2={width - padX} y2={yMinY} />
+              </g>
+
+              {/* Vertical guide for active point */}
+              {activePoint ? (
+                <line
+                  className="growth-chart-guide"
+                  x1={activePoint.x}
+                  y1={padTop}
+                  x2={activePoint.x}
+                  y2={baselineY}
+                />
+              ) : null}
+
+              {/* Area fill */}
+              {points.length > 1 ? (
+                <path d={areaPath} fill={`url(#growth-fill-${tone})`} />
+              ) : null}
+
+              {/* Smooth line */}
+              {points.length > 1 ? (
+                <path
+                  className="growth-chart-line"
+                  d={linePath}
+                  stroke={`url(#growth-line-${tone})`}
+                  filter={`url(#growth-glow-${tone})`}
+                  fill="none"
+                />
+              ) : null}
+
+              {/* Static dots */}
+              {points.map((point, idx) => (
                 <circle
-                  key={`${metricKey}-${point.label}-${point.x}-${point.y}`}
+                  key={`${metricKey}-${point.occurredAt}-${idx}`}
+                  className={`growth-chart-dot ${idx === activeIndex ? "is-active" : ""}`}
                   cx={point.x}
                   cy={point.y}
-                  r={points.length === 1 ? "6" : "4.5"}
+                  r={idx === activeIndex ? 6 : points.length === 1 ? 6 : 4}
                 />
               ))}
+
+              {/* Pulse halo for active point */}
+              {activePoint ? (
+                <circle
+                  className="growth-chart-halo"
+                  cx={activePoint.x}
+                  cy={activePoint.y}
+                  r="14"
+                />
+              ) : null}
             </svg>
+
+            {/* HTML-tooltip пристёгнут к activePoint, корректно работает с touch */}
+            {activePoint ? (
+              <div
+                className="growth-chart-tooltip"
+                style={{
+                  left: `${(tooltipPositionLeft / width) * 100}%`,
+                  top: `${(activePoint.y / height) * 100}%`,
+                }}
+                role="status"
+                aria-live="polite"
+              >
+                <span className="growth-chart-tooltip-value">
+                  {formatGrowthValue(activePoint.value, metricKey)}
+                </span>
+                <span className="growth-chart-tooltip-date">
+                  {activePoint.label}
+                </span>
+              </div>
+            ) : null}
           </div>
           <div className="growth-axis-row">
             <span>{values[0]?.label}</span>
-            <span>
-              {values.length} {values.length === 1 ? "замер" : "замеров"}
+            <span className="growth-axis-center">
+              {values.length}{" "}
+              {values.length === 1
+                ? "замер"
+                : values.length < 5
+                  ? "замера"
+                  : "замеров"}
+              {values.length > 1 ? ` · ${formatGrowthSpan(readings)}` : ""}
             </span>
             <span>{values.at(-1)?.label}</span>
           </div>
@@ -897,52 +1502,299 @@ function GrowthMetricPanel({
   );
 }
 
+/**
+ * Универсальная карточка периода со списком строк-метрик.
+ * Используется для подгузников / сна / прогулок / купания,
+ * где есть одна крупная цифра + 1-3 строки разбивки.
+ */
+type PeriodCardTone = "day" | "week" | "month";
+type PeriodCardCategory =
+  | "diaper"
+  | "sleep"
+  | "walk"
+  | "bath"
+  | "feeding";
+
+interface PeriodCardRow {
+  icon: string;
+  label: string;
+  value: string;
+  unit?: string;
+  meta?: string;
+  /** data-source для row-color */
+  source?: string;
+}
+
+function PeriodCard({
+  category,
+  tone,
+  period,
+  headIcon,
+  headValue,
+  headUnit,
+  emptyText,
+  rows,
+}: {
+  category: PeriodCardCategory;
+  tone: PeriodCardTone;
+  period: string;
+  headIcon: string;
+  headValue: string;
+  headUnit?: string;
+  emptyText: string;
+  rows: PeriodCardRow[];
+}) {
+  const visibleRows = rows.filter((row) => row.value !== "" && row.value !== "0");
+  const isEmpty = visibleRows.length === 0;
+  return (
+    <div
+      className={`feeding-card period-card period-${category} period-${category}-${tone}`}
+    >
+      <div className="feeding-card-head">
+        <span className="feeding-card-icon" aria-hidden="true">
+          {headIcon}
+        </span>
+        <div className="feeding-card-period">{period}</div>
+        <div className="feeding-card-count">
+          {headValue}
+          {headUnit ? (
+            <span className="feeding-card-count-unit">{headUnit}</span>
+          ) : null}
+        </div>
+      </div>
+      {isEmpty ? (
+        <div className="feeding-card-empty">{emptyText}</div>
+      ) : (
+        <ul className="feeding-card-rows" role="list">
+          {visibleRows.map((row, idx) => (
+            <li
+              key={`${row.label}-${idx}`}
+              className="feeding-row"
+              data-source={row.source ?? category}
+            >
+              <span className="feeding-row-icon" aria-hidden="true">
+                {row.icon}
+              </span>
+              <span className="feeding-row-label">{row.label}</span>
+              <span className="feeding-row-value">
+                {row.value}
+                {row.unit ? (
+                  <span className="feeding-row-unit">{row.unit}</span>
+                ) : null}
+              </span>
+              {row.meta ? (
+                <span className="feeding-row-meta">{row.meta}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Карточка одного периода кормления (День / Неделя / Месяц).
+ * Внутри 3 строки разбивки: грудь (минуты), смесь (мл), сцеженное (мл).
+ * Если ни одной нет — показываем placeholder вместо пустых нулей.
+ */
+function FeedingPeriodCard({
+  period,
+  stats,
+  tone,
+}: {
+  period: string;
+  stats: {
+    count: number;
+    breastCount: number;
+    breastMinutes: number;
+    bottleCount: number;
+    formulaMl: number;
+    breastMilkMl: number;
+    totalMl: number;
+  };
+  tone: "day" | "week" | "month";
+}) {
+  const breastShown = stats.breastCount > 0;
+  const breastMilkShown = stats.breastMilkMl > 0;
+  const formulaShown = stats.formulaMl > 0;
+  const isEmpty = stats.count === 0;
+  const periodIcon = tone === "day" ? "🍼" : tone === "week" ? "📅" : "📆";
+
+  return (
+    <div className={`feeding-card feeding-card-${tone}`}>
+      <div className="feeding-card-head">
+        <span className="feeding-card-icon" aria-hidden="true">
+          {periodIcon}
+        </span>
+        <div className="feeding-card-period">{period}</div>
+        <div className="feeding-card-count" aria-label={`Всего кормлений: ${stats.count}`}>
+          {stats.count}
+          <span className="feeding-card-count-unit">кормл.</span>
+        </div>
+      </div>
+
+      {isEmpty ? (
+        <div className="feeding-card-empty">записей нет</div>
+      ) : (
+        <ul className="feeding-card-rows" role="list">
+          {breastShown ? (
+            <li className="feeding-row" data-source="breast">
+              <span className="feeding-row-icon" aria-hidden="true">🤱</span>
+              <span className="feeding-row-label">Грудь</span>
+              <span className="feeding-row-value">
+                {formatDuration(stats.breastMinutes)}
+              </span>
+              <span className="feeding-row-meta">
+                {stats.breastCount}{" "}
+                {stats.breastCount === 1 ? "раз" : "раза"}
+              </span>
+            </li>
+          ) : null}
+
+          {breastMilkShown ? (
+            <li className="feeding-row" data-source="breast-milk">
+              <span className="feeding-row-icon" aria-hidden="true">💧</span>
+              <span className="feeding-row-label">Сцеженное</span>
+              <span className="feeding-row-value">
+                {stats.breastMilkMl}
+                <span className="feeding-row-unit">мл</span>
+              </span>
+              <span className="feeding-row-meta">
+                {/* кол-во бутылочек со сцеженным = тех, что не formula */}
+                {/* totalBottles - formulaCount; здесь приближение через
+                    bottleCount, если formulaShown без формулы — оставим */}
+                {stats.bottleCount}{" "}
+                {stats.bottleCount === 1 ? "бут." : "бут."}
+              </span>
+            </li>
+          ) : null}
+
+          {formulaShown ? (
+            <li className="feeding-row" data-source="formula">
+              <span className="feeding-row-icon" aria-hidden="true">🍼</span>
+              <span className="feeding-row-label">Смесь</span>
+              <span className="feeding-row-value">
+                {stats.formulaMl}
+                <span className="feeding-row-unit">мл</span>
+              </span>
+              <span className="feeding-row-meta">
+                {stats.bottleCount}{" "}
+                {stats.bottleCount === 1 ? "бут." : "бут."}
+              </span>
+            </li>
+          ) : null}
+
+          {breastMilkShown || formulaShown ? (
+            <li className="feeding-row feeding-row-total" data-source="total">
+              <span className="feeding-row-label">Итого жидкости</span>
+              <span className="feeding-row-value">
+                {stats.totalMl}
+                <span className="feeding-row-unit">мл</span>
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function GrowthChart({ readings }: { readings: GrowthReading[] }) {
-  const latestWeight = [...readings]
+  const [range, setRange] = useState<GrowthRange>("all");
+  const filteredReadings = filterGrowthByRange(readings, range);
+  const latestWeight = [...filteredReadings]
     .reverse()
     .find((reading) => reading.weightKg !== null);
-  const latestHeight = [...readings]
+  const latestHeight = [...filteredReadings]
     .reverse()
     .find((reading) => reading.heightCm !== null);
+  const lastDate = filteredReadings.length
+    ? filteredReadings.at(-1)?.label
+    : readings.at(-1)?.label;
 
   return (
     <Card className="growth-card">
       <SectionTitle
-        eyebrow="Развитие"
         title="Вес и рост"
         action={
-          readings.length ? <Pill>{readings.at(-1)?.label}</Pill> : undefined
+          readings.length > 0 ? (
+            <div
+              className="growth-range-tabs"
+              role="tablist"
+              aria-label="Период графика"
+            >
+              {(
+                [
+                  { id: "7d" as const, label: "Неделя" },
+                  { id: "30d" as const, label: "Месяц" },
+                  { id: "all" as const, label: "Всё" },
+                ] satisfies Array<{ id: GrowthRange; label: string }>
+              ).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={range === option.id}
+                  className={
+                    range === option.id
+                      ? "growth-range-tab active"
+                      : "growth-range-tab"
+                  }
+                  onClick={() => setRange(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : undefined
         }
       />
-      {readings.length ? (
+      {filteredReadings.length ? (
         <>
-          <div className="growth-summary-row">
-            <Surface className="growth-summary-tile">
-              <span>Вес</span>
-              <strong>
-                {formatGrowthValue(latestWeight?.weightKg ?? null, "weightKg")}
-              </strong>
-            </Surface>
-            <Surface className="growth-summary-tile">
-              <span>Рост</span>
-              <strong>
-                {formatGrowthValue(latestHeight?.heightCm ?? null, "heightCm")}
-              </strong>
-            </Surface>
-            <Surface className="growth-summary-tile">
-              <span>Измерений</span>
-              <strong>{readings.length}</strong>
-            </Surface>
+          <div className="growth-summary-bar" aria-live="polite">
+            <div className="growth-summary-stat">
+              <span className="growth-summary-stat-label">Последний замер</span>
+              <span className="growth-summary-stat-value">
+                {lastDate ?? "—"}
+              </span>
+            </div>
+            <div className="growth-summary-stat">
+              <span className="growth-summary-stat-label">Замеров в периоде</span>
+              <span className="growth-summary-stat-value">
+                {filteredReadings.length}
+              </span>
+            </div>
           </div>
           <div className="growth-panel-grid">
-            <GrowthMetricPanel readings={readings} metricKey="weightKg" />
-            <GrowthMetricPanel readings={readings} metricKey="heightCm" />
+            <GrowthMetricPanel
+              readings={filteredReadings}
+              metricKey="weightKg"
+            />
+            <GrowthMetricPanel
+              readings={filteredReadings}
+              metricKey="heightCm"
+            />
           </div>
+          {latestWeight && latestHeight ? (
+            <div className="growth-current-row">
+              <span className="growth-current-pill">
+                Сейчас:{" "}
+                {formatGrowthValue(latestWeight.weightKg, "weightKg")} ·{" "}
+                {formatGrowthValue(latestHeight.heightCm, "heightCm")}
+              </span>
+            </div>
+          ) : null}
         </>
-      ) : (
+      ) : readings.length === 0 ? (
         <EmptyState
           title="Измерений пока нет"
           description="После записи веса или роста здесь появится динамика."
+        />
+      ) : (
+        <EmptyState
+          title="В этом периоде нет замеров"
+          description="Переключите фильтр на «Всё», чтобы увидеть всю историю."
         />
       )}
     </Card>
@@ -1046,6 +1898,10 @@ function resolveActionId(kind: CareEventKind): ActionId {
       return "medication";
     case "GROWTH":
       return "growth";
+    case "WALK":
+      return "walk";
+    case "BATH":
+      return "bath";
     case "NOTE":
     default:
       return "note";
@@ -1055,7 +1911,11 @@ function resolveActionId(kind: CareEventKind): ActionId {
 function resolvePresetId(event: CareEventRecord): string {
   switch (event.kind) {
     case "FEEDING":
-      return event.payload.mode === "BOTTLE" ? "bottle" : "breast";
+      return event.payload.mode === "BREAST_BOTTLE"
+        ? "breast_bottle"
+        : event.payload.mode === "BOTTLE"
+          ? "bottle"
+          : "breast";
     case "SOLID_FOOD":
       return "solid_food";
     case "SLEEP":
@@ -1065,13 +1925,28 @@ function resolvePresetId(event: CareEventRecord): string {
         ? "dirty"
         : event.payload.type === "MIXED"
           ? "mixed"
-          : "wet";
+          : event.payload.type === "DRY_CHECK"
+            ? // legacy события с DRY_CHECK: пробуем восстановить наблюдение
+              (event.payload.observed === "DIRTY"
+                ? "dirty"
+                : event.payload.observed === "MIXED"
+                  ? "mixed"
+                  : "wet")
+            : "wet";
     case "TEMPERATURE":
       return "temperature";
     case "MEDICATION":
       return "custom_medication";
     case "GROWTH":
       return "growth";
+    case "WALK":
+      return event.payload.phase === "START"
+        ? "walk_start"
+        : Number(event.payload.durationMinutes ?? 0) > 0
+          ? "walk_manual"
+          : "walk_end";
+    case "BATH":
+      return "bath";
     case "NOTE":
     default:
       return "note";
@@ -1079,27 +1954,40 @@ function resolvePresetId(event: CareEventRecord): string {
 }
 
 function toTimeInput(value: string): string {
-  const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  // Время события в часовом поясе Москвы — независимо от локального TZ
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Moscow",
+  }).format(new Date(value));
 }
 
 function combineDateAndTime(dateValue: string, timeValue: string): string {
   const [year, month, day] = dateValue.split("-").map(Number);
   const [hours, minutes] = timeValue.split(":").map(Number);
-  const base = new Date();
 
-  if (year && month && day) {
-    base.setFullYear(year, month - 1, day);
-  }
+  // Интерпретируем выбранное время в часовом поясе Москвы (UTC+3),
+  // чтобы запись была одинаковой для родителей в любой TZ устройства.
+  const safeYear = year || new Date().getUTCFullYear();
+  const safeMonth = month ? month - 1 : new Date().getUTCMonth();
+  const safeDay = day || new Date().getUTCDate();
+  const h = Number.isFinite(hours) ? hours : 0;
+  const m = Number.isFinite(minutes) ? minutes : 0;
+  // 14:30 МСК = 11:30 UTC. UTC = МСК - 3
+  return new Date(
+    Date.UTC(safeYear, safeMonth, safeDay, h - 3, m, 0, 0),
+  ).toISOString();
+}
 
-  base.setHours(
-    Number.isFinite(hours) ? hours : 0,
-    Number.isFinite(minutes) ? minutes : 0,
-    0,
-    0,
-  );
-
-  return base.toISOString();
+/** Текущее время в формате HH:MM по Москве — для дефолта в форме. */
+function moscowNowTimeString(): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Moscow",
+  }).format(new Date());
 }
 
 function extractInputValue(event: CareEventRecord): string {
@@ -1127,6 +2015,11 @@ function extractInputValue(event: CareEventRecord): string {
 
   if (event.kind === "GROWTH") {
     return String(event.payload.note ?? "");
+  }
+
+  if (event.kind === "WALK" || event.kind === "BATH") {
+    const minutes = Number(event.payload.durationMinutes ?? 0);
+    return minutes > 0 ? String(minutes) : "";
   }
 
   if (event.kind === "NOTE") {
@@ -1167,6 +2060,10 @@ function accentFromEvent(kind: CareEventKind): string {
       return "#f97316";
     case "GROWTH":
       return "#38bdf8";
+    case "WALK":
+      return "#34d399";
+    case "BATH":
+      return "#60a5fa";
     case "NOTE":
     default:
       return "#a3e635";
@@ -1182,6 +2079,185 @@ function minutesSince(iso?: string) {
     0,
     Math.round((Date.now() - new Date(iso).getTime()) / 60000),
   );
+}
+
+/**
+ * Возвращает миллисекунды начала текущего «дня» в часовом поясе Москвы (UTC+3).
+ * Используется как якорь для всей дневной/недельной/месячной статистики:
+ * день переключается ровно в 00:00 МСК, независимо от часового пояса устройства.
+ *
+ * dayOffset = 0 → начало сегодня по МСК
+ * dayOffset = -1 → начало вчера по МСК
+ */
+function moscowDayStart(now = new Date(), dayOffset = 0): number {
+  const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000; // UTC+3, без DST с 2014
+  // Сдвигаем «сейчас» в московскую шкалу, обнуляем время, возвращаем обратно в UTC.
+  const moscowNow = now.getTime() + MOSCOW_OFFSET_MS;
+  const moscowDayStartUTC =
+    Math.floor(moscowNow / 86_400_000) * 86_400_000 - MOSCOW_OFFSET_MS;
+  return moscowDayStartUTC + dayOffset * 86_400_000;
+}
+
+/**
+ * Сколько подгузников было сменено в окне последних N календарных дней по МСК.
+ * Окно [startOfDay(today - days + 1), now]. Считаем только реальные смены.
+ */
+function diaperChangesInDays(
+  events: CareEventRecord[],
+  days: number,
+): number {
+  const start = moscowDayStart(new Date(), -(days - 1));
+  return events.filter(
+    (event) =>
+      event.kind === "DIAPER" &&
+      event.payload.changed !== false &&
+      new Date(event.occurredAt).getTime() >= start,
+  ).length;
+}
+
+/** Подгузники: разбивка по типу + сухой контроль за период. */
+function diaperStatsInDays(events: CareEventRecord[], days: number) {
+  const inWindow = eventsInDays(events, days).filter(
+    (event) => event.kind === "DIAPER",
+  );
+  const changed = inWindow.filter((event) => event.payload.changed !== false);
+  const wet = changed.filter((event) => event.payload.type === "WET").length;
+  const dirty = changed.filter((event) => event.payload.type === "DIRTY").length;
+  const mixed = changed.filter((event) => event.payload.type === "MIXED").length;
+  const checked = inWindow.length - changed.length;
+  return { changed: changed.length, wet, dirty, mixed, checked };
+}
+
+/** Базовая фильтрация событий по окну Москвы [сегодня - days + 1, сейчас]. */
+function eventsInDays(
+  events: CareEventRecord[],
+  days: number,
+): CareEventRecord[] {
+  const start = moscowDayStart(new Date(), -(days - 1));
+  return events.filter(
+    (event) => new Date(event.occurredAt).getTime() >= start,
+  );
+}
+
+/** Кормления: количество, мл (раздельно смесь/сцеженное), минуты груди. */
+function feedingStatsInDays(events: CareEventRecord[], days: number) {
+  const inWindow = eventsInDays(events, days).filter(
+    (event) => event.kind === "FEEDING",
+  );
+  // Минуты груди — суммируем durationMinutes по mode === "BREAST"
+  const breastEvents = inWindow.filter(
+    (event) => event.payload.mode === "BREAST",
+  );
+  const breastMinutes = breastEvents.reduce((sum, event) => {
+    const m = Number(event.payload.durationMinutes ?? 0);
+    return sum + (Number.isFinite(m) && m > 0 ? m : 0);
+  }, 0);
+  // Бутылочка-смесь и сцеженное молоко считаются раздельно
+  const formulaMl = inWindow
+    .filter((event) => event.payload.mode === "BOTTLE")
+    .reduce((sum, event) => {
+      const v = Number(event.payload.volumeMl ?? 0);
+      return sum + (Number.isFinite(v) && v > 0 ? v : 0);
+    }, 0);
+  const breastMilkMl = inWindow
+    .filter((event) => event.payload.mode === "BREAST_BOTTLE")
+    .reduce((sum, event) => {
+      const v = Number(event.payload.volumeMl ?? 0);
+      return sum + (Number.isFinite(v) && v > 0 ? v : 0);
+    }, 0);
+  const bottleCount = inWindow.filter(
+    (event) =>
+      event.payload.mode === "BOTTLE" || event.payload.mode === "BREAST_BOTTLE",
+  ).length;
+  return {
+    count: inWindow.length,
+    breastCount: breastEvents.length,
+    breastMinutes: Math.round(breastMinutes),
+    bottleCount,
+    formulaMl: Math.round(formulaMl),
+    breastMilkMl: Math.round(breastMilkMl),
+    totalMl: Math.round(formulaMl + breastMilkMl),
+  };
+}
+
+/** Сон: количество отрезков и общая длительность в минутах (только пары START→END). */
+function sleepStatsInDays(events: CareEventRecord[], days: number) {
+  const inWindow = eventsInDays(events, days).filter(
+    (event) => event.kind === "SLEEP",
+  );
+  const starts = inWindow
+    .filter((event) => event.payload.phase === "START")
+    .sort(
+      (l, r) =>
+        new Date(l.occurredAt).getTime() - new Date(r.occurredAt).getTime(),
+    );
+  const ends = inWindow
+    .filter((event) => event.payload.phase === "END")
+    .sort(
+      (l, r) =>
+        new Date(l.occurredAt).getTime() - new Date(r.occurredAt).getTime(),
+    );
+  let totalMinutes = 0;
+  let completed = 0;
+  starts.forEach((startEvent, index) => {
+    const endEvent = ends[index];
+    const endTime = endEvent
+      ? new Date(endEvent.occurredAt).getTime()
+      : Date.now();
+    if (endEvent) completed += 1;
+    totalMinutes += Math.max(
+      0,
+      Math.round(
+        (endTime - new Date(startEvent.occurredAt).getTime()) / 60000,
+      ),
+    );
+  });
+  return { sessions: completed, totalMinutes };
+}
+
+/** Прогулка: количество завершённых выходов и общая длительность в минутах. */
+function walkStatsInDays(events: CareEventRecord[], days: number) {
+  const inWindow = eventsInDays(events, days).filter(
+    (event) => event.kind === "WALK",
+  );
+  const starts = inWindow.filter((event) => event.payload.phase === "START");
+  const ends = inWindow.filter((event) => event.payload.phase === "END");
+  let totalMinutes = 0;
+  // Парные сессии START→END
+  const pairCount = Math.min(starts.length, ends.length);
+  starts.slice(0, pairCount).forEach((s, idx) => {
+    const e = ends[idx];
+    if (!e) return;
+    totalMinutes += Math.max(
+      0,
+      Math.round(
+        (new Date(e.occurredAt).getTime() -
+          new Date(s.occurredAt).getTime()) /
+          60000,
+      ),
+    );
+  });
+  // Ручной ввод (END с явной durationMinutes без пары)
+  const manualEnds = ends
+    .slice(pairCount)
+    .filter((event) => Number(event.payload.durationMinutes ?? 0) > 0);
+  manualEnds.forEach((event) => {
+    totalMinutes += Math.max(0, Number(event.payload.durationMinutes ?? 0));
+  });
+  return { sessions: pairCount + manualEnds.length, totalMinutes };
+}
+
+/** Купание: количество и общая длительность в минутах. */
+function bathStatsInDays(events: CareEventRecord[], days: number) {
+  const inWindow = eventsInDays(events, days).filter(
+    (event) => event.kind === "BATH",
+  );
+  const totalMinutes = inWindow.reduce(
+    (sum, event) =>
+      sum + Math.max(0, Number(event.payload.durationMinutes ?? 0)),
+    0,
+  );
+  return { sessions: inWindow.length, totalMinutes };
 }
 
 function latestEvent(
@@ -1284,15 +2360,14 @@ export function CareDashboard() {
     refreshAi,
     downloadExport,
     deleteQuickItem,
+    removeEvent,
   } = useCareDashboard();
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [sheetActionId, setSheetActionId] = useState<ActionId | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   const [inputValue, setInputValue] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [timeValue, setTimeValue] = useState(
-    toTimeInput(new Date().toISOString()),
-  );
+  const [timeValue, setTimeValue] = useState(moscowNowTimeString());
   const [entryDateValue, setEntryDateValue] = useState(() =>
     toDateInputValue(new Date()),
   );
@@ -1319,6 +2394,15 @@ export function CareDashboard() {
     string | null
   >(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDeleteEvent, setPendingDeleteEvent] =
+    useState<CareEventRecord | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  /**
+   * Тоггл «Сменили подгузник» — относится только к экрану ввода подгузника.
+   * По умолчанию true (что соответствует превалирующему сценарию: смена).
+   * Если выключен — событие сохраняется как сухой контроль (changed=false, type=DRY_CHECK).
+   */
+  const [diaperChanged, setDiaperChanged] = useState(true);
   const sheetPanelRef = useRef<HTMLDivElement>(null);
   const mainInputRef = useRef<HTMLInputElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -1349,9 +2433,10 @@ export function CareDashboard() {
     setInputValue(preset?.defaultInput ?? "");
     setFieldValues(getDefaultFieldValues(preset));
     setEntryDateValue(toDateInputValue(new Date()));
-    setTimeValue(toTimeInput(new Date().toISOString()));
+    setTimeValue(moscowNowTimeString());
     setSheetActor(activeActor);
     setEditingEvent(null);
+    setDiaperChanged(true);
   };
 
   const openEditSheet = (event: CareEventRecord) => {
@@ -1375,6 +2460,17 @@ export function CareDashboard() {
     setTimeValue(toTimeInput(event.occurredAt));
     setSheetActor(event.actor);
     setEditingEvent(event);
+    if (event.kind === "DIAPER") {
+      // События с DRY_CHECK или явно сохранённым changed=false означают «не меняли»
+      setDiaperChanged(
+        event.payload.changed === false ||
+          event.payload.type === "DRY_CHECK"
+          ? false
+          : true,
+      );
+    } else {
+      setDiaperChanged(true);
+    }
   };
 
   const closeSheet = () => {
@@ -1383,6 +2479,7 @@ export function CareDashboard() {
     setInputValue("");
     setFieldValues({});
     setEditingEvent(null);
+    setDiaperChanged(true);
   };
 
   useEffect(() => {
@@ -1431,6 +2528,37 @@ export function CareDashboard() {
     };
   }, [currentAction]);
 
+  /**
+   * Авто-перерисовка дашборда ровно в 00:00 МСК.
+   * Считает миллисекунды до следующей московской полуночи и
+   * форсит refresh снимка, чтобы статистика сменилась без ручного действия.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleNext = () => {
+      const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000;
+      const moscowNow = Date.now() + MOSCOW_OFFSET_MS;
+      const nextMoscowMidnightUtc =
+        (Math.floor(moscowNow / 86_400_000) + 1) * 86_400_000 -
+        MOSCOW_OFFSET_MS;
+      // +500ms запас, чтобы пройти границу гарантированно
+      const delay = Math.max(1000, nextMoscowMidnightUtc - Date.now() + 500);
+      timerId = setTimeout(() => {
+        if (cancelled) return;
+        void refreshSnapshot(false).catch(() => {});
+        scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, []);
+
   const handleSubmit = async () => {
     if (!currentAction || !currentPreset) {
       return;
@@ -1449,18 +2577,36 @@ export function CareDashboard() {
         fieldValues,
       });
 
+      // Применяем тоггл "Сменили подгузник" только для DIAPER:
+      // если меняли — оставляем как есть (changed=true, исходный type),
+      // если не меняли — сохраняем что увидели + меняем глагол в summary,
+      // type остаётся реальным (WET/DIRTY/MIXED), чтобы не терять статистику.
+      const finalDraft =
+        currentAction.id === "diaper"
+          ? {
+              ...draft,
+              summary: diaperChanged
+                ? draft.summary
+                : `Проверили подгузник — ${currentPreset.label.toLowerCase()}`,
+              payload: {
+                ...draft.payload,
+                changed: diaperChanged,
+              },
+            }
+          : draft;
+
       if (editingEvent) {
         const updatedEvent: CareEventRecord = {
           ...editingEvent,
-          actor: draft.actor,
-          occurredAt: draft.occurredAt,
-          summary: draft.summary,
-          payload: draft.payload,
-          status: (draft.status ?? editingEvent.status) as EventStatus,
+          actor: finalDraft.actor,
+          occurredAt: finalDraft.occurredAt,
+          summary: finalDraft.summary,
+          payload: finalDraft.payload,
+          status: (finalDraft.status ?? editingEvent.status) as EventStatus,
         };
         await editEvent(updatedEvent);
       } else {
-        await addEvent(draft);
+        await addEvent(finalDraft);
       }
       closeSheet();
     } catch {
@@ -1505,6 +2651,21 @@ export function CareDashboard() {
       );
     } finally {
       setExportingFormat(null);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteEvent) {
+      return;
+    }
+    setDeletingEventId(pendingDeleteEvent.id);
+    try {
+      await removeEvent(pendingDeleteEvent);
+      setPendingDeleteEvent(null);
+    } catch {
+      // ошибка уже отрендерена баннером, диалог оставляем чтобы пользователь повторил
+    } finally {
+      setDeletingEventId(null);
     }
   };
 
@@ -1585,7 +2746,15 @@ export function CareDashboard() {
     {
       label: "Кормлений",
       value: String(activeSummary.feedingsCount),
-      helper: activeSummary.title,
+      helper: `грудь ${activeSummary.feedingsBreastCount ?? 0} • бутылочка ${activeSummary.feedingsBottleCount ?? 0}`,
+    },
+    {
+      label: "Молоко всего",
+      value: `${activeSummary.feedingsTotalMl ?? 0} мл`,
+      helper:
+        (activeSummary.feedingsBreastMilkBottleCount ?? 0) > 0
+          ? `сцеженное молоко ${activeSummary.feedingsBreastMilkBottleCount}`
+          : "смесь и сцеженное молоко",
     },
     {
       label: "Прикорм",
@@ -1603,9 +2772,38 @@ export function CareDashboard() {
       helper: "между кормлениями",
     },
     {
-      label: "Подгузники",
-      value: `${activeSummary.diaperWetCount + activeSummary.diaperDirtyCount + (activeSummary.diaperMixedCount ?? 0)}`,
-      helper: `моча ${activeSummary.diaperWetCount} • кака ${activeSummary.diaperDirtyCount} • вместе ${activeSummary.diaperMixedCount ?? 0}`,
+      label: "Сменили подгузник",
+      value: String(
+        activeSummary.diaperChangedCount ??
+          activeSummary.diaperWetCount +
+            activeSummary.diaperDirtyCount +
+            (activeSummary.diaperMixedCount ?? 0),
+      ),
+      helper: `моча ${activeSummary.diaperWetCount} • кака ${activeSummary.diaperDirtyCount} • вместе ${activeSummary.diaperMixedCount ?? 0}${
+        (activeSummary.diaperCheckedOnlyCount ?? 0) > 0
+          ? ` • сухой контроль ${activeSummary.diaperCheckedOnlyCount}`
+          : ""
+      }`,
+    },
+    {
+      label: "Прогулка",
+      value: formatDuration(activeSummary.totalWalkMinutes ?? 0),
+      helper:
+        (activeSummary.walkSessionsCount ?? 0) > 0
+          ? `${activeSummary.walkSessionsCount} ${
+              (activeSummary.walkSessionsCount ?? 0) === 1 ? "выход" : "выхода"
+            }`
+          : "за период не было",
+    },
+    {
+      label: "Купание",
+      value: formatDuration(activeSummary.totalBathMinutes ?? 0),
+      helper:
+        (activeSummary.bathSessionsCount ?? 0) > 0
+          ? `${activeSummary.bathSessionsCount} ${
+              (activeSummary.bathSessionsCount ?? 0) === 1 ? "раз" : "раза"
+            }`
+          : "за период не было",
     },
     {
       label: "Температура",
@@ -1653,12 +2851,6 @@ export function CareDashboard() {
     kind: exportKindFilter === "ALL" ? "all" : exportKindFilter,
     actor: exportActorFilter === "ALL" ? "all" : exportActorFilter,
   };
-  const primaryActions = orderedActions.filter((action) =>
-    ["feeding", "diaper", "sleep", "temperature"].includes(action.id),
-  );
-  const secondaryActions = orderedActions.filter(
-    (action) => !primaryActions.includes(action),
-  );
   const exportPeriodLabel =
     snapshot.periodSummaries.find((summary) => summary.id === exportPeriodId)
       ?.title ?? "период";
@@ -1669,6 +2861,48 @@ export function CareDashboard() {
     actorFilterOptions.find((option) => option.id === exportActorFilter)
       ?.label ?? "Оба";
   const nextCareStep = buildNextCareStep(snapshot);
+  const todaySummary = snapshot.summary;
+  const totalDiaperEvents =
+    (todaySummary.diaperWetCount ?? 0) +
+    (todaySummary.diaperDirtyCount ?? 0) +
+    (todaySummary.diaperMixedCount ?? 0);
+  const diaperChangedCount = todaySummary.diaperChangedCount ?? totalDiaperEvents;
+  const diaperCheckedOnlyCount = todaySummary.diaperCheckedOnlyCount ?? 0;
+  const totalFeedingMl = todaySummary.feedingsTotalMl ?? 0;
+  const breastFeedingsCount = todaySummary.feedingsBreastCount ?? 0;
+  const bottleFeedingsCount = todaySummary.feedingsBottleCount ?? 0;
+  const breastMilkBottleCount = todaySummary.feedingsBreastMilkBottleCount ?? 0;
+  const totalWalkMinutes = todaySummary.totalWalkMinutes ?? 0;
+  const walkSessionsCount = todaySummary.walkSessionsCount ?? 0;
+  const totalBathMinutes = todaySummary.totalBathMinutes ?? 0;
+  const bathSessionsCount = todaySummary.bathSessionsCount ?? 0;
+
+  // Расход подгузников за день / неделю / месяц + средний в день за неделю.
+  // Считаем только фактические смены (без «только проверили»).
+  const diapersToday = diaperChangesInDays(snapshot.events, 1);
+  const diapersWeek = diaperChangesInDays(snapshot.events, 7);
+  const diapersMonth = diaperChangesInDays(snapshot.events, 30);
+  const diaperAvgPerDay =
+    diapersWeek > 0 ? Math.round((diapersWeek / 7) * 10) / 10 : 0;
+
+  // Подробная разбивка подгузников по типам/проверкам
+  const diaperDay = diaperStatsInDays(snapshot.events, 1);
+  const diaperWeekStats = diaperStatsInDays(snapshot.events, 7);
+  const diaperMonthStats = diaperStatsInDays(snapshot.events, 30);
+
+  // Период-статы для всех остальных категорий
+  const feedingsDay = feedingStatsInDays(snapshot.events, 1);
+  const feedingsWeek = feedingStatsInDays(snapshot.events, 7);
+  const feedingsMonth = feedingStatsInDays(snapshot.events, 30);
+  const sleepDay = sleepStatsInDays(snapshot.events, 1);
+  const sleepWeek = sleepStatsInDays(snapshot.events, 7);
+  const sleepMonth = sleepStatsInDays(snapshot.events, 30);
+  const walkDay = walkStatsInDays(snapshot.events, 1);
+  const walkWeek = walkStatsInDays(snapshot.events, 7);
+  const walkMonth = walkStatsInDays(snapshot.events, 30);
+  const bathDay = bathStatsInDays(snapshot.events, 1);
+  const bathWeek = bathStatsInDays(snapshot.events, 7);
+  const bathMonth = bathStatsInDays(snapshot.events, 30);
   const syncLabel =
     conflictCount > 0
       ? `${conflictCount} запись требует проверки`
@@ -1681,93 +2915,479 @@ export function CareDashboard() {
             : lastSyncedAt
               ? `Актуально в ${formatTime(lastSyncedAt)}`
               : "Актуально";
+  // ---- Home: live status helpers ---------------------------------------
+  const lastFeedEvent = snapshot.events.find(
+    (event) => event.kind === "FEEDING",
+  );
+  const lastDiaperEvent = snapshot.events.find(
+    (event) => event.kind === "DIAPER" && event.payload.changed !== false,
+  );
+  const lastTempEvent = snapshot.events.find(
+    (event) => event.kind === "TEMPERATURE",
+  );
+  const sleepingNow = Boolean(snapshot.timers.sleepStartedAt);
+  const sleepDurationMinutes = snapshot.timers.sleepDurationMinutes ?? 0;
+  const minutesSinceLastFeed = lastFeedEvent
+    ? minutesSince(lastFeedEvent.occurredAt)
+    : null;
+  const minutesSinceLastDiaper = lastDiaperEvent
+    ? minutesSince(lastDiaperEvent.occurredAt)
+    : null;
+  const lastTempC = lastTempEvent
+    ? Number(lastTempEvent.payload.temperatureC ?? 0)
+    : null;
+
+  const liveStatus = (() => {
+    if (snapshot.events.length === 0) {
+      return {
+        kicker: "Готовы начать",
+        title: `Привет, ${snapshot.child.name}`,
+        body: "Сделайте первую запись — мама и папа увидят её мгновенно.",
+        tone: "default" as const,
+      };
+    }
+    if (sleepingNow) {
+      return {
+        kicker: "Сейчас",
+        title: "Спит",
+        body:
+          sleepDurationMinutes > 0
+            ? `${formatDuration(sleepDurationMinutes)} с ${formatTime(snapshot.timers.sleepStartedAt)}`
+            : `с ${formatTime(snapshot.timers.sleepStartedAt)}`,
+        tone: "calm" as const,
+      };
+    }
+    if (lastTempC !== null && lastTempC >= 37.5) {
+      return {
+        kicker: "Внимание",
+        title: `Температура ${lastTempC.toFixed(1)}°C`,
+        body: "Полезно повторить замер и держать лекарства под рукой.",
+        tone: "danger" as const,
+      };
+    }
+    if (minutesSinceLastFeed !== null && minutesSinceLastFeed >= 180) {
+      return {
+        kicker: "Пора",
+        title: "Кормление",
+        body: `Прошло ${formatDuration(minutesSinceLastFeed)} с последней записи.`,
+        tone: "warm" as const,
+      };
+    }
+    if (minutesSinceLastDiaper !== null && minutesSinceLastDiaper >= 120) {
+      return {
+        kicker: "Проверьте",
+        title: "Подгузник",
+        body: `${formatDuration(minutesSinceLastDiaper)} со смены.`,
+        tone: "warm" as const,
+      };
+    }
+    return {
+      kicker: "Сейчас",
+      title: "Бодрствует",
+      body:
+        minutesSinceLastFeed !== null
+          ? `Кормили ${formatDuration(minutesSinceLastFeed)} назад. Режим спокойный.`
+          : "Режим спокойный.",
+      tone: "default" as const,
+    };
+  })();
+
+  /** Чипы today digest. Кликабельные — переводят на нужный фильтр в ленте. */
+  const todayChips = [
+    {
+      key: "milk",
+      icon: "🍼",
+      label: "Молоко",
+      value: `${totalFeedingMl} мл`,
+      hint:
+        breastMilkBottleCount > 0 && bottleFeedingsCount > breastMilkBottleCount
+          ? `смесь ${bottleFeedingsCount - breastMilkBottleCount} · сцеж. ${breastMilkBottleCount}`
+          : breastMilkBottleCount > 0
+            ? `сцеж. ${breastMilkBottleCount}`
+            : null,
+      filter: "FEEDING" as FeedKindFilter,
+    },
+    {
+      key: "feedings",
+      icon: "🤱",
+      label: "Кормлений",
+      value: String(todaySummary.feedingsCount),
+      hint:
+        breastFeedingsCount > 0 || bottleFeedingsCount > 0
+          ? `грудь ${breastFeedingsCount} · бут. ${bottleFeedingsCount}`
+          : null,
+      filter: "FEEDING" as FeedKindFilter,
+    },
+    {
+      key: "diaper",
+      icon: "🧷",
+      label: "Сменили",
+      value: String(diaperChangedCount),
+      hint:
+        diaperCheckedOnlyCount > 0
+          ? `+ проверили ${diaperCheckedOnlyCount}`
+          : null,
+      filter: "DIAPER" as FeedKindFilter,
+    },
+    {
+      key: "sleep",
+      icon: "🌙",
+      label: "Сон",
+      value: formatDuration(todaySummary.totalSleepMinutes),
+      hint: null,
+      filter: "SLEEP" as FeedKindFilter,
+    },
+    {
+      key: "walk",
+      icon: "🌳",
+      label: "Прогулка",
+      value: formatDuration(totalWalkMinutes),
+      hint:
+        walkSessionsCount > 0
+          ? `${walkSessionsCount} ${walkSessionsCount === 1 ? "выход" : "выхода"}`
+          : null,
+      filter: "WALK" as FeedKindFilter,
+    },
+    {
+      key: "bath",
+      icon: "🛁",
+      label: "Купание",
+      value: formatDuration(totalBathMinutes),
+      hint:
+        bathSessionsCount > 0
+          ? `${bathSessionsCount} ${bathSessionsCount === 1 ? "раз" : "раза"}`
+          : null,
+      filter: "BATH" as FeedKindFilter,
+    },
+  ];
+
   const renderHome = () => (
     <>
       <section className="dashboard-section">
-        <Card className="hero-card command-center-card">
-          <div className="hero-topline">
-            <div>
-              <div className="eyebrow">Состояние ребёнка</div>
-              <h1 className="hero-title">{snapshot.child.name}</h1>
-            </div>
-            <Pill>{snapshot.overview.age}</Pill>
-          </div>
+        <div className="hero-greeting" aria-label={`Привет, ${snapshot.child.name}`}>
+          {/* декоративные слои */}
+          <span className="hero-stars" aria-hidden="true">
+            <span className="hero-star hero-star-1" />
+            <span className="hero-star hero-star-2" />
+            <span className="hero-star hero-star-3" />
+            <span className="hero-star hero-star-4" />
+            <span className="hero-star hero-star-5" />
+          </span>
+          <span className="hero-blob hero-blob-1" aria-hidden="true" />
+          <span className="hero-blob hero-blob-2" aria-hidden="true" />
+          <span className="hero-blob hero-blob-3" aria-hidden="true" />
 
-          <div className="command-metrics">
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Возраст"
-                value={snapshot.overview.age}
-                helper="по дате рождения"
-              />
-            </Surface>
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Кормление"
-                value={snapshot.overview.lastFeeding}
-                helper="последняя запись"
-              />
-            </Surface>
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Сон"
-                value={snapshot.overview.sleepStatus}
-                helper={
-                  snapshot.timers.sleepStartedAt
-                    ? `идёт с ${formatTime(snapshot.timers.sleepStartedAt)}`
-                    : "сейчас бодрствует"
-                }
-              />
-            </Surface>
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Подгузник"
-                value={snapshot.overview.diaperGap}
-                helper="последняя смена"
-              />
-            </Surface>
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Температура"
-                value={snapshot.overview.temperature}
-                helper="последний замер"
-              />
-            </Surface>
-            <Surface className="command-metric">
-              <InlineMetric
-                label="Лекарства"
-                value={snapshot.overview.medication}
-                helper="последняя отметка"
-              />
-            </Surface>
+          <div className="hero-content">
+            <span className="hero-hi">Привет,</span>
+            <h1 className="hero-name">{snapshot.child.name}</h1>
+            <span className="hero-divider" aria-hidden="true" />
           </div>
+        </div>
 
-          <div className={`care-now-card info-only tone-${nextCareStep.tone}`}>
-            <div>
-              <div className="care-now-kicker">Текущее состояние</div>
-              <div className="care-now-title">{nextCareStep.title}</div>
-              <div className="care-now-body">{nextCareStep.body}</div>
-            </div>
-          </div>
-
-          <div className="sync-panel">
-            <div>
+        <div className="home-meta-row">
+          {(() => {
+            const age = calculateAgeBreakdown(snapshot.child.birthDate);
+            return (
               <div
-                className="sync-dot"
-                data-state={
-                  conflictCount > 0 ? "conflict" : online ? "online" : "offline"
-                }
-              />
-              <span>{syncLabel}</span>
-            </div>
+                className="age-card"
+                role="group"
+                aria-label={`Возраст: ${age.primary} ${age.primaryUnit}, ${age.totalDays} дней`}
+              >
+                <div className="age-card-main">
+                  <span className="age-card-primary">{age.primary}</span>
+                  {age.primaryUnit ? (
+                    <span className="age-card-unit">{age.primaryUnit}</span>
+                  ) : null}
+                </div>
+                <div className="age-card-meta">
+                  <span className="age-card-days">{age.totalDays} дн</span>
+                  {age.milestone ? (
+                    <span className="age-card-milestone">
+                      <span
+                        className="age-card-milestone-icon"
+                        aria-hidden="true"
+                      >
+                        ✨
+                      </span>
+                      <span>
+                        до {age.milestone.label}{" "}
+                        <strong>
+                          {age.milestone.daysLeft}{" "}
+                          {age.milestone.daysLeft === 1
+                            ? "день"
+                            : age.milestone.daysLeft < 5
+                              ? "дня"
+                              : "дней"}
+                        </strong>
+                      </span>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {conflictCount > 0 ? (
+          <div className="sync-warning">
+            На другом устройстве запись уже изменилась. Откройте ленту, проверьте
+            и сохраните исправление повторно.
           </div>
-          {conflictCount > 0 ? (
-            <div className="sync-warning">
-              На другом устройстве эта запись уже изменилась. Откройте ленту,
-              проверьте запись и сохраните исправление повторно.
-            </div>
-          ) : null}
-        </Card>
+        ) : null}
+      </section>
+
+      <section className="dashboard-section">
+        <SectionTitle title="Кормления" />
+        <div className="feeding-stats-grid">
+          <FeedingPeriodCard period="День" stats={feedingsDay} tone="day" />
+          <FeedingPeriodCard
+            period="Неделя"
+            stats={feedingsWeek}
+            tone="week"
+          />
+          <FeedingPeriodCard
+            period="Месяц"
+            stats={feedingsMonth}
+            tone="month"
+          />
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <SectionTitle title="Расход подгузников" />
+        <div className="feeding-stats-grid">
+          {(
+            [
+              {
+                tone: "day" as const,
+                period: "День",
+                stats: diaperDay,
+                total: diapersToday,
+                empty: "сегодня не меняли",
+              },
+              {
+                tone: "week" as const,
+                period: "Неделя",
+                stats: diaperWeekStats,
+                total: diapersWeek,
+                empty: "за 7 дней нет смен",
+              },
+              {
+                tone: "month" as const,
+                period: "Месяц",
+                stats: diaperMonthStats,
+                total: diapersMonth,
+                empty: "за 30 дней нет смен",
+              },
+            ] as const
+          ).map(({ tone, period, stats, total, empty }) => (
+            <PeriodCard
+              key={tone}
+              category="diaper"
+              tone={tone}
+              period={period}
+              headIcon={tone === "day" ? "🧷" : tone === "week" ? "📅" : "📆"}
+              headValue={String(total)}
+              headUnit="смен"
+              emptyText={empty}
+              rows={[
+                {
+                  icon: "💧",
+                  label: "Пописал",
+                  value: stats.wet > 0 ? String(stats.wet) : "0",
+                  source: "diaper-wet",
+                },
+                {
+                  icon: "💩",
+                  label: "Покакал",
+                  value: stats.dirty > 0 ? String(stats.dirty) : "0",
+                  source: "diaper-dirty",
+                },
+                {
+                  icon: "🟫",
+                  label: "Оба",
+                  value: stats.mixed > 0 ? String(stats.mixed) : "0",
+                  source: "diaper-mixed",
+                },
+                ...(stats.checked > 0
+                  ? [
+                      {
+                        icon: "👀",
+                        label: "Проверили",
+                        value: String(stats.checked),
+                        source: "diaper-check",
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <SectionTitle title="Сон" />
+        <div className="feeding-stats-grid">
+          {(
+            [
+              { tone: "day" as const, period: "День", stats: sleepDay, empty: "сегодня сна нет" },
+              { tone: "week" as const, period: "Неделя", stats: sleepWeek, empty: "за 7 дней нет данных" },
+              { tone: "month" as const, period: "Месяц", stats: sleepMonth, empty: "за 30 дней нет данных" },
+            ] as const
+          ).map(({ tone, period, stats, empty }) => {
+            const avgSession =
+              stats.sessions > 0
+                ? Math.round(stats.totalMinutes / stats.sessions)
+                : 0;
+            const days = tone === "day" ? 1 : tone === "week" ? 7 : 30;
+            const avgPerDay = Math.round(stats.totalMinutes / days);
+            return (
+              <PeriodCard
+                key={tone}
+                category="sleep"
+                tone={tone}
+                period={period}
+                headIcon={tone === "day" ? "🌙" : tone === "week" ? "📅" : "📆"}
+                headValue={formatDuration(stats.totalMinutes)}
+                emptyText={empty}
+                rows={[
+                  {
+                    icon: "💤",
+                    label: "Отрезков",
+                    value: stats.sessions > 0 ? String(stats.sessions) : "0",
+                    source: "sleep-sessions",
+                  },
+                  ...(stats.sessions > 0
+                    ? [
+                        {
+                          icon: "⏱",
+                          label: "Средний",
+                          value: formatDuration(avgSession),
+                          source: "sleep-avg",
+                        },
+                      ]
+                    : []),
+                  ...(tone !== "day" && stats.totalMinutes > 0
+                    ? [
+                        {
+                          icon: "📊",
+                          label: "В день",
+                          value: formatDuration(avgPerDay),
+                          source: "sleep-per-day",
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <SectionTitle title="Прогулки" />
+        <div className="feeding-stats-grid">
+          {(
+            [
+              { tone: "day" as const, period: "День", stats: walkDay, empty: "сегодня не гуляли" },
+              { tone: "week" as const, period: "Неделя", stats: walkWeek, empty: "за 7 дней не гуляли" },
+              { tone: "month" as const, period: "Месяц", stats: walkMonth, empty: "за 30 дней не гуляли" },
+            ] as const
+          ).map(({ tone, period, stats, empty }) => {
+            const avgSession =
+              stats.sessions > 0
+                ? Math.round(stats.totalMinutes / stats.sessions)
+                : 0;
+            const days = tone === "day" ? 1 : tone === "week" ? 7 : 30;
+            const avgPerDay = Math.round(stats.totalMinutes / days);
+            return (
+              <PeriodCard
+                key={tone}
+                category="walk"
+                tone={tone}
+                period={period}
+                headIcon={tone === "day" ? "🌳" : tone === "week" ? "📅" : "📆"}
+                headValue={formatDuration(stats.totalMinutes)}
+                emptyText={empty}
+                rows={[
+                  {
+                    icon: "🚶",
+                    label: "Выходов",
+                    value: stats.sessions > 0 ? String(stats.sessions) : "0",
+                    source: "walk-sessions",
+                  },
+                  ...(stats.sessions > 0
+                    ? [
+                        {
+                          icon: "⏱",
+                          label: "Средний",
+                          value: formatDuration(avgSession),
+                          source: "walk-avg",
+                        },
+                      ]
+                    : []),
+                  ...(tone !== "day" && stats.totalMinutes > 0
+                    ? [
+                        {
+                          icon: "📊",
+                          label: "В день",
+                          value: formatDuration(avgPerDay),
+                          source: "walk-per-day",
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <SectionTitle title="Купание" />
+        <div className="feeding-stats-grid">
+          {(
+            [
+              { tone: "day" as const, period: "День", stats: bathDay, empty: "сегодня не купались" },
+              { tone: "week" as const, period: "Неделя", stats: bathWeek, empty: "за 7 дней не купались" },
+              { tone: "month" as const, period: "Месяц", stats: bathMonth, empty: "за 30 дней не купались" },
+            ] as const
+          ).map(({ tone, period, stats, empty }) => {
+            const avgSession =
+              stats.sessions > 0
+                ? Math.round(stats.totalMinutes / stats.sessions)
+                : 0;
+            return (
+              <PeriodCard
+                key={tone}
+                category="bath"
+                tone={tone}
+                period={period}
+                headIcon={tone === "day" ? "🛁" : tone === "week" ? "📅" : "📆"}
+                headValue={formatDuration(stats.totalMinutes)}
+                emptyText={empty}
+                rows={[
+                  {
+                    icon: "🧴",
+                    label: "Раз",
+                    value: stats.sessions > 0 ? String(stats.sessions) : "0",
+                    source: "bath-sessions",
+                  },
+                  ...(stats.sessions > 0
+                    ? [
+                        {
+                          icon: "⏱",
+                          label: "Средний",
+                          value: formatDuration(avgSession),
+                          source: "bath-avg",
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            );
+          })}
+        </div>
       </section>
 
       <section className="dashboard-section">
@@ -1778,48 +3398,28 @@ export function CareDashboard() {
 
   const renderLog = () => (
     <section className="dashboard-section">
-      <Card className="log-command-card">
-        <SectionTitle eyebrow="Запись" title="Главные действия под рукой" />
-        <div className="log-primary-grid">
-          {primaryActions.map((action) => (
-            <ActionButton
-              key={action.id}
-              icon={action.icon}
-              title={action.title}
-              subtitle={actionSubtitle(action, activeActor)}
-              onClick={() => openCreateSheet(action.id)}
-            />
-          ))}
-        </div>
-        <div className="log-secondary-panel">
-          <div>
-            <div className="filter-title">Ещё записи</div>
-            <div className="log-secondary-copy">
-              Прикорм, лекарства, заметки и контроль роста без длинных форм.
-            </div>
-          </div>
-          <div className="log-secondary-grid">
-            {secondaryActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className="log-secondary-button"
-                onClick={() => openCreateSheet(action.id)}
-              >
-                <span>{action.icon}</span>
-                <strong>{action.title}</strong>
-              </button>
-            ))}
-          </div>
-        </div>
-      </Card>
+      <div className="log-tile-grid">
+        {orderedActions.map((action) => (
+          <button
+            key={action.id}
+            type="button"
+            className="log-tile"
+            onClick={() => openCreateSheet(action.id)}
+            aria-label={`Записать: ${action.title}`}
+          >
+            <span className="log-tile-icon" aria-hidden="true">
+              {action.icon}
+            </span>
+            <span className="log-tile-title">{action.title}</span>
+          </button>
+        ))}
+      </div>
     </section>
   );
 
   const renderFeed = () => (
     <section className="dashboard-section">
       <Card>
-        <SectionTitle eyebrow="Все действия" title="Семейная лента" />
         <div className="filter-panel">
           <div className="filter-row">
             {kindFilterOptions.map((option) => (
@@ -1882,16 +3482,27 @@ export function CareDashboard() {
                             {formatDateTime(event.occurredAt)}
                           </div>
                         </div>
-                        <GhostButton
-                          style={{
-                            minHeight: 34,
-                            padding: "7px 10px",
-                            fontSize: 12,
-                          }}
-                          onClick={() => openEditSheet(event)}
-                        >
-                          Править
-                        </GhostButton>
+                        <div className="feed-card-actions">
+                          <GhostButton
+                            style={{
+                              minHeight: 34,
+                              padding: "7px 10px",
+                              fontSize: 12,
+                            }}
+                            onClick={() => openEditSheet(event)}
+                          >
+                            Править
+                          </GhostButton>
+                          <button
+                            type="button"
+                            className="feed-card-delete"
+                            aria-label={`Удалить запись «${event.summary}»`}
+                            onClick={() => setPendingDeleteEvent(event)}
+                            disabled={deletingEventId === event.id}
+                          >
+                            {deletingEventId === event.id ? "…" : "✕"}
+                          </button>
+                        </div>
                       </div>
                       <div className="feed-card-badges">
                         <Pill tone={toneFromEvent(event)}>
@@ -2024,7 +3635,6 @@ export function CareDashboard() {
   const renderExport = () => (
     <section className="dashboard-section">
       <Card className="export-command-card">
-        <SectionTitle eyebrow="Для врача" title="Отчёт за 10 секунд" />
         {exportError ? (
           <div className="error-banner" role="alert">
             {exportError}
@@ -2249,6 +3859,7 @@ export function CareDashboard() {
                       preset.id === selectedPresetId
                         ? "preset-card active"
                         : "preset-card",
+                      preset.helper ? "" : "preset-card-compact",
                       preset.quickItem ? "with-delete" : "",
                     ]
                       .filter(Boolean)
@@ -2260,18 +3871,10 @@ export function CareDashboard() {
                       setFieldValues(getDefaultFieldValues(preset));
                     }}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>
-                      {preset.label}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 6,
-                        color: "var(--muted-strong)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {preset.helper}
-                    </div>
+                    <div className="preset-card-title">{preset.label}</div>
+                    {preset.helper ? (
+                      <div className="preset-card-helper">{preset.helper}</div>
+                    ) : null}
                   </button>
                   {preset.quickItem ? (
                     <button
@@ -2293,6 +3896,29 @@ export function CareDashboard() {
                 </div>
               ))}
             </div>
+
+            {currentAction.id === "diaper" ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={diaperChanged}
+                className={
+                  diaperChanged
+                    ? "diaper-toggle active"
+                    : "diaper-toggle"
+                }
+                onClick={() => setDiaperChanged((value) => !value)}
+              >
+                <span className="diaper-toggle-track" aria-hidden="true">
+                  <span className="diaper-toggle-thumb" />
+                </span>
+                <span className="diaper-toggle-content">
+                  <span className="diaper-toggle-title">
+                    Сменили подгузник
+                  </span>
+                </span>
+              </button>
+            ) : null}
 
             <div className="field-grid entry-date-time-grid">
               <label className="field">
@@ -2318,19 +3944,87 @@ export function CareDashboard() {
             {currentPreset.inputLabel ? (
               <label className="field">
                 <span>{currentPreset.inputLabel}</span>
-                <input
-                  ref={mainInputRef}
-                  type={currentPreset.inputType ?? "text"}
-                  value={inputValue}
-                  placeholder={currentPreset.inputPlaceholder}
-                  aria-invalid={Boolean(submitValidationMessage)}
-                  aria-describedby={
-                    submitValidationMessage
-                      ? "care-entry-validation"
-                      : undefined
+                {(() => {
+                  const stepCfg = getStepperConfig(currentAction, currentPreset);
+                  if (!stepCfg) {
+                    return (
+                      <input
+                        ref={mainInputRef}
+                        type={currentPreset.inputType ?? "text"}
+                        value={inputValue}
+                        placeholder={currentPreset.inputPlaceholder}
+                        aria-invalid={Boolean(submitValidationMessage)}
+                        aria-describedby={
+                          submitValidationMessage
+                            ? "care-entry-validation"
+                            : undefined
+                        }
+                        onChange={(event) =>
+                          setInputValue(event.target.value)
+                        }
+                      />
+                    );
                   }
-                  onChange={(event) => setInputValue(event.target.value)}
-                />
+                  const fallback = parseNumber(currentPreset.defaultInput, 0);
+                  return (
+                    <div className="stepper-field">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Уменьшить"
+                        onClick={() =>
+                          setInputValue(
+                            applyStepperDelta(
+                              inputValue,
+                              -1,
+                              stepCfg,
+                              fallback,
+                            ),
+                          )
+                        }
+                      >
+                        −
+                      </button>
+                      <input
+                        ref={mainInputRef}
+                        type="number"
+                        inputMode="decimal"
+                        step={stepCfg.step}
+                        min={stepCfg.min}
+                        max={stepCfg.max}
+                        value={inputValue}
+                        placeholder={currentPreset.inputPlaceholder}
+                        aria-invalid={Boolean(submitValidationMessage)}
+                        aria-describedby={
+                          submitValidationMessage
+                            ? "care-entry-validation"
+                            : undefined
+                        }
+                        className="stepper-input"
+                        onChange={(event) =>
+                          setInputValue(event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Увеличить"
+                        onClick={() =>
+                          setInputValue(
+                            applyStepperDelta(
+                              inputValue,
+                              1,
+                              stepCfg,
+                              fallback,
+                            ),
+                          )
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  );
+                })()}
               </label>
             ) : null}
 
@@ -2378,6 +4072,55 @@ export function CareDashboard() {
                   : editingEvent
                     ? "Сохранить исправление"
                     : "Добавить событие"}
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingDeleteEvent ? (
+        <div
+          className="sheet-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!deletingEventId) {
+              setPendingDeleteEvent(null);
+            }
+          }}
+        >
+          <div
+            className="confirm-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="eyebrow">Удаление</div>
+            <h3 id="confirm-delete-title" className="confirm-title">
+              Удалить запись?
+            </h3>
+            <div className="confirm-summary">{pendingDeleteEvent.summary}</div>
+            <div className="confirm-meta">
+              {actorLabel(pendingDeleteEvent.actor)} ·{" "}
+              {eventKindLabel(pendingDeleteEvent.kind)} ·{" "}
+              {formatDateTime(pendingDeleteEvent.occurredAt)}
+            </div>
+            <div className="confirm-actions">
+              <GhostButton
+                onClick={() => setPendingDeleteEvent(null)}
+                disabled={Boolean(deletingEventId)}
+              >
+                Отмена
+              </GhostButton>
+              <PrimaryButton
+                onClick={() => void handleConfirmDelete()}
+                disabled={Boolean(deletingEventId)}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #f87171 0%, #ef4444 60%, #dc2626 100%)",
+                }}
+              >
+                {deletingEventId ? "Удаляю…" : "Удалить"}
               </PrimaryButton>
             </div>
           </div>

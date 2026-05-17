@@ -19,6 +19,7 @@ import {
   markPendingOperationConflicted,
   removeEventOverride,
   removeLocalEvent,
+  removePendingOperation,
   removePendingOperationIfUnchanged,
   saveEventOverride,
   saveCachedSnapshot,
@@ -630,50 +631,120 @@ export function useCareDashboard() {
   }, [accessDenied, actorLocked, sessionReady]);
 
   useEffect(() => {
-    const syncNow = () => {
+    /** Полный sync (pending → server, потом snapshot). Тихий, без loading. */
+    const syncFull = () => {
+      void syncWithServer(false).catch(() => {
+        updatePendingCounters();
+      });
+    };
+
+    /** Лёгкая проверка versions — не дёргает сервер если SSE-стрим жив. */
+    const syncLight = () => {
       if (document.visibilityState === "hidden") {
         return;
       }
-
       if (realtimeConnectedRef.current) {
         return;
       }
-
       void checkRemoteSyncState().catch(() => {
         updatePendingCounters();
       });
     };
 
-    const intervalId = window.setInterval(syncNow, SYNC_STATE_INTERVAL_MS);
+    // 1. Polling-интервалы как фоновые (на случай если SSE упал и нет focus-событий)
+    const intervalId = window.setInterval(syncLight, SYNC_STATE_INTERVAL_MS);
     const fullIntervalId = window.setInterval(() => {
       if (document.visibilityState !== "hidden") {
-        void syncWithServer(false).catch(() => {
-          updatePendingCounters();
-        });
+        syncFull();
       }
     }, FULL_SYNC_INTERVAL_MS);
+
+    // 2. Visibility — таб стал видимым (вернулись из другого приложения / разблокировали телефон)
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        void syncWithServer(false).catch(() => {
-          updatePendingCounters();
-        });
+        syncFull();
       }
     };
-
     document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // 3. Window focus — переключение между вкладками / окнами (важно на PC и Telegram Desktop)
+    const onFocus = () => {
+      syncFull();
+    };
+    window.addEventListener("focus", onFocus);
+
+    // 4. pageshow — возврат из BFCache (Safari, мобильный Chrome) после
+    //    свайпа «назад». persisted=true означает, что страница восстановлена
+    //    из памяти и наши таймеры могли быть заморожены.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        syncFull();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+
+    // 5. resume — Telegram Mini App / iOS низкая память: страница «размораживается».
+    //    Срабатывает не везде, но где есть — даёт мгновенный sync.
+    const onResume = () => {
+      syncFull();
+    };
+    document.addEventListener("resume", onResume as EventListener);
+
+    // 6. storage-pulse — когда другая вкладка/окно того же браузера завершила
+    //    запись, она пишет ключ amir.sync-pulse → срабатывает у других вкладок.
     const onStorage = (event: StorageEvent) => {
       if (event.key === SYNC_PULSE_KEY) {
-        void syncWithServer(false).catch(() => {
-          updatePendingCounters();
-        });
+        syncFull();
       }
     };
     window.addEventListener("storage", onStorage);
+
+    // 7. ВЫХОД: pagehide / beforeunload / freeze (BFCache) — последний шанс
+    //    успеть отправить pending-операции пока браузер не выгрузил страницу.
+    //    Используем keepalive-fetch для надёжной доставки (sync-effort).
+    const flushPendingOnExit = () => {
+      try {
+        const pending = getPendingOperations().filter(
+          (op) => !op.conflictedAt,
+        );
+        if (pending.length === 0) return;
+        // Шлём только create-операции через keepalive — update требует
+        // expectedRevision, который актуален только в онлайне.
+        for (const op of pending) {
+          if (op.operation !== "create") continue;
+          fetch("/api/events", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...buildTelegramHeaders(op.draft.actor),
+            },
+            body: JSON.stringify(op.draft),
+            keepalive: true,
+            cache: "no-store",
+          }).catch(() => {
+            // best-effort, ошибки игнорируем — операция останется в очереди
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    };
+    const onPageHide = () => flushPendingOnExit();
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onPageHide);
+    document.addEventListener("freeze", flushPendingOnExit as EventListener);
+
     return () => {
       window.clearInterval(intervalId);
       window.clearInterval(fullIntervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("resume", onResume as EventListener);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onPageHide);
+      document.removeEventListener("freeze", flushPendingOnExit as EventListener);
     };
   }, []);
 
@@ -1052,6 +1123,80 @@ export function useCareDashboard() {
     },
   );
 
+  const removeEvent = useEffectEvent(async (event: CareEventRecord) => {
+    // Снимаем pending-операции, связанные с этим event'ом, через публичное API
+    getPendingOperations()
+      .filter((op) => {
+        if (op.localEventId === event.id) {
+          return true;
+        }
+        if (op.operation === "update" && op.serverEventId === event.id) {
+          return true;
+        }
+        return false;
+      })
+      .forEach((op) => {
+        removePendingOperation(op.id);
+      });
+
+    removeLocalEvent(event.id);
+    removeEventOverride(event.id);
+
+    startTransition(() => {
+      setSnapshot((current) =>
+        current
+          ? {
+              ...current,
+              events: current.events.filter((item) => item.id !== event.id),
+            }
+          : current,
+      );
+      updatePendingCounters();
+      setError("");
+    });
+
+    // Локальный, ещё не синхронизированный event — серверный delete не нужен
+    if (event.source === "local" && typeof event.revision !== "number") {
+      void refreshSnapshot(false);
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      // оффлайн — оставляем как есть, локально удалили
+      return;
+    }
+
+    try {
+      await fetchJson<{ ok: boolean; id: string }>("/api/events", {
+        method: "DELETE",
+        headers: buildTelegramHeaders(activeActor),
+        body: JSON.stringify({ id: event.id }),
+      });
+      publishSyncPulse();
+      void refreshSnapshot(false);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.statusCode === 404) {
+        // запись уже удалена на сервере — ок
+        return;
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Не удалось удалить запись на сервере.";
+      setError(message);
+      // Откат: возвращаем запись в локальный кеш
+      const restored = upsertLocalEvent(event);
+      startTransition(() => {
+        setSnapshot((current) =>
+          current
+            ? mergeSnapshot(current, restored, getEventOverrides())
+            : current,
+        );
+      });
+      throw error;
+    }
+  });
+
   const deleteQuickItem = useEffectEvent(
     async (kind: QuickItemKind, label: string, key: string) => {
       try {
@@ -1114,5 +1259,6 @@ export function useCareDashboard() {
     refreshAi,
     downloadExport,
     deleteQuickItem,
+    removeEvent,
   };
 }

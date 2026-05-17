@@ -1,137 +1,194 @@
+/* ==========================================================================
+   Amir Family Care — Design System v2 "Aurora"
+   --------------------------------------------------------------------------
+   • Tokens: цвет, типографика, радиусы, тени, motion
+   • Сохраняет все существующие селекторы dashboard, чтобы не ломать TSX
+   • Тёмная тема — глубокий night-charcoal с бронзовыми и aurora-акцентами
+   • Светлая тема — мягкий paper-blue, контрастная типографика
+   ========================================================================== */
+
+/* ---------- 1. Tokens (dark, default) ------------------------------------ */
 :root {
-  --bg: #050609;
-  --bg-elevated: rgba(22, 24, 29, 0.9);
-  --card: rgba(24, 26, 32, 0.7);
-  --surface: rgba(255, 255, 255, 0.07);
-  --surface-strong: rgba(255, 255, 255, 0.125);
-  --border: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.24);
-  --text: #f5f5f7;
-  --muted: #9398a3;
-  --muted-strong: #d9dde6;
-  --accent: #0a84ff;
-  --accent-2: #63e6be;
-  --accent-3: #ffb55c;
-  --danger: #ff453a;
-  --danger-soft: rgba(251, 113, 133, 0.14);
-  --danger-text: #ffd6d2;
-  --good-soft: rgba(48, 209, 88, 0.14);
-  --good-text: #b8f7c7;
-  --warn-soft: rgba(255, 214, 10, 0.14);
-  --warn-text: #ffe88a;
-  --primary-text: #ffffff;
-  --shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
-  --inner-highlight:
-    inset 0 1px 0 rgba(255, 255, 255, 0.13),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-  --hairline: rgba(255, 255, 255, 0.08);
+  /* Brand & accent */
+  --aurora-1: #6ee7b7;     /* mint */
+  --aurora-2: #38bdf8;     /* sky */
+  --aurora-3: #a78bfa;     /* violet */
+  --aurora-4: #fb923c;     /* amber for warm states */
+  --accent: #38bdf8;
+  --accent-2: #6ee7b7;
+  --accent-3: #fbbf24;
+  --accent-gradient: linear-gradient(135deg, #6ee7b7 0%, #38bdf8 50%, #a78bfa 100%);
+  --accent-gradient-warm: linear-gradient(135deg, #fbbf24 0%, #fb923c 60%, #f472b6 100%);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+
+  /* Neutrals (dark) */
+  --bg: #0b0d12;
+  --bg-elevated: rgba(20, 23, 30, 0.86);
+  --card: rgba(22, 25, 33, 0.74);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.085);
+  --surface-pressed: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --hairline: rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --text: #f4f5f8;
+  --text-strong: #ffffff;
+  --muted: #8a8f9c;
+  --muted-strong: #c4c8d1;
+  --primary-text: #07111f;
+
+  /* Semantic */
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.14);
+  --good-text: #a7f3d0;
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --warn-text: #fde68a;
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --danger-text: #fecaca;
+
+  /* Surfaces, gradients */
   --page-bg:
-    radial-gradient(
-      circle at 14% -10%,
-      rgba(20, 107, 255, 0.34),
-      transparent 28%
-    ),
-    radial-gradient(
-      circle at 92% 0%,
-      rgba(99, 230, 190, 0.18),
-      transparent 25%
-    ),
-    radial-gradient(
-      circle at 44% 112%,
-      rgba(255, 181, 92, 0.12),
-      transparent 32%
-    ),
-    linear-gradient(180deg, #111722 0%, #050609 52%, #010204 100%);
-  --card-bg: linear-gradient(
-    150deg,
-    rgba(40, 44, 54, 0.82),
-    rgba(13, 15, 20, 0.9) 58%,
-    rgba(8, 10, 14, 0.94)
-  );
-  --sheet-bg: linear-gradient(
-    180deg,
-    rgba(30, 30, 33, 0.96),
-    rgba(12, 12, 14, 0.98)
-  );
-  --nav-bg: rgba(26, 28, 34, 0.72);
-  --field-bg: rgba(118, 118, 128, 0.16);
-  --backdrop: rgba(0, 0, 0, 0.58);
-  --bottom-nav-height: 96px;
+    radial-gradient(circle at 8% -8%, rgba(110, 231, 183, 0.18), transparent 32%),
+    radial-gradient(circle at 96% 4%, rgba(167, 139, 250, 0.18), transparent 32%),
+    radial-gradient(circle at 50% 110%, rgba(251, 146, 60, 0.10), transparent 38%),
+    linear-gradient(180deg, #11141c 0%, #0b0d12 60%, #060709 100%);
+  --card-bg:
+    linear-gradient(155deg,
+      rgba(36, 40, 51, 0.82) 0%,
+      rgba(18, 20, 27, 0.88) 60%,
+      rgba(10, 12, 16, 0.92) 100%);
+  --sheet-bg:
+    linear-gradient(180deg,
+      rgba(28, 31, 40, 0.96) 0%,
+      rgba(14, 16, 22, 0.98) 100%);
+  --nav-bg: rgba(20, 22, 30, 0.72);
+  --field-bg: rgba(255, 255, 255, 0.05);
+  --field-bg-focus: rgba(255, 255, 255, 0.085);
+  --backdrop: rgba(4, 5, 8, 0.62);
+
+  /* Radii — мягкая 4-step шкала */
+  --radius-xs: 12px;
+  --radius-sm: 18px;
+  --radius-md: 22px;
+  --radius-lg: 30px;
+  --radius-xl: 40px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.24);
+  --shadow-3: 0 28px 60px rgba(0, 0, 0, 0.32);
+  --shadow: var(--shadow-2);
+  --inner-highlight:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+  --glow-accent: 0 12px 36px color-mix(in srgb, var(--accent) 30%, transparent);
+
+  /* Typography */
+  --font-display:
+    var(--font-display-loaded), "Manrope", -apple-system, BlinkMacSystemFont,
+    "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-text:
+    var(--font-text-loaded), "Inter", -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono", "Geist Mono", "SF Mono", ui-monospace, monospace;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 140ms;
+  --dur-2: 220ms;
+  --dur-3: 360ms;
+
+  /* Layout */
+  --bottom-nav-height: 88px;
+  --container-max: 1080px;
 }
 
+/* ---------- 2. Light theme (paper-blue) ---------------------------------- */
 :root[data-theme="light"] {
-  --bg: #f3f5f8;
-  --bg-elevated: rgba(255, 255, 255, 0.9);
-  --card: rgba(255, 255, 255, 0.76);
-  --surface: rgba(255, 255, 255, 0.68);
-  --surface-strong: rgba(255, 255, 255, 0.9);
-  --border: rgba(60, 60, 67, 0.13);
-  --border-strong: rgba(60, 60, 67, 0.22);
-  --text: #1d1d1f;
-  --muted: #6e6e73;
-  --muted-strong: #3a3a3c;
-  --accent: #007aff;
-  --accent-2: #26c99a;
-  --accent-3: #ff9f0a;
-  --danger: #ff3b30;
-  --danger-soft: rgba(255, 59, 48, 0.09);
-  --danger-text: #b42318;
-  --good-soft: rgba(52, 199, 89, 0.1);
-  --good-text: #1f7a38;
-  --warn-soft: rgba(255, 149, 0, 0.11);
-  --warn-text: #9a5a00;
+  --aurora-1: #14b8a6;
+  --aurora-2: #2563eb;
+  --aurora-3: #7c3aed;
+  --aurora-4: #ea580c;
+  --accent: #2563eb;
+  --accent-2: #14b8a6;
+  --accent-3: #f59e0b;
+  --accent-gradient: linear-gradient(135deg, #14b8a6 0%, #2563eb 55%, #7c3aed 100%);
+  --accent-gradient-warm: linear-gradient(135deg, #f59e0b 0%, #ea580c 60%, #db2777 100%);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+
+  --bg: #f4f6fa;
+  --bg-elevated: rgba(255, 255, 255, 0.92);
+  --card: rgba(255, 255, 255, 0.78);
+  --surface: rgba(255, 255, 255, 0.74);
+  --surface-strong: rgba(255, 255, 255, 0.92);
+  --surface-pressed: rgba(255, 255, 255, 1);
+  --border: rgba(15, 23, 42, 0.10);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --hairline: rgba(15, 23, 42, 0.06);
+
+  --text: #0f172a;
+  --text-strong: #020617;
+  --muted: #64748b;
+  --muted-strong: #334155;
   --primary-text: #ffffff;
-  --shadow: 0 22px 54px rgba(20, 32, 52, 0.11);
+
+  --good: #059669;
+  --good-soft: rgba(16, 185, 129, 0.10);
+  --good-text: #047857;
+  --warn: #d97706;
+  --warn-soft: rgba(245, 158, 11, 0.12);
+  --warn-text: #92400e;
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.10);
+  --danger-text: #991b1b;
+
+  --page-bg:
+    radial-gradient(circle at 8% -6%, rgba(20, 184, 166, 0.16), transparent 30%),
+    radial-gradient(circle at 96% 4%, rgba(124, 58, 237, 0.12), transparent 30%),
+    radial-gradient(circle at 50% 112%, rgba(245, 158, 11, 0.10), transparent 36%),
+    linear-gradient(180deg, #ffffff 0%, #f1f5fa 60%, #e8edf5 100%);
+  --card-bg:
+    linear-gradient(155deg,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(247, 250, 254, 0.84) 60%,
+      rgba(239, 243, 250, 0.92) 100%);
+  --sheet-bg:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(244, 246, 250, 0.98) 100%);
+  --nav-bg: rgba(255, 255, 255, 0.78);
+  --field-bg: rgba(15, 23, 42, 0.04);
+  --field-bg-focus: rgba(15, 23, 42, 0.07);
+  --backdrop: rgba(15, 23, 42, 0.32);
+
+  --shadow-1: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-2: 0 12px 28px rgba(15, 23, 42, 0.10);
+  --shadow-3: 0 28px 56px rgba(15, 23, 42, 0.14);
   --inner-highlight:
     inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.34);
-  --hairline: rgba(60, 60, 67, 0.08);
-  --page-bg:
-    radial-gradient(
-      circle at 14% -8%,
-      rgba(0, 122, 255, 0.18),
-      transparent 28%
-    ),
-    radial-gradient(circle at 90% 0%, rgba(52, 199, 89, 0.12), transparent 24%),
-    radial-gradient(
-      circle at 50% 112%,
-      rgba(255, 149, 0, 0.12),
-      transparent 32%
-    ),
-    linear-gradient(180deg, #ffffff 0%, #f3f6fa 54%, #e9edf5 100%);
-  --card-bg: linear-gradient(
-    150deg,
-    rgba(255, 255, 255, 0.94),
-    rgba(247, 249, 253, 0.78) 58%,
-    rgba(241, 245, 250, 0.88)
-  );
-  --sheet-bg: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.96),
-    rgba(246, 246, 248, 0.98)
-  );
-  --nav-bg: rgba(255, 255, 255, 0.72);
-  --field-bg: rgba(118, 118, 128, 0.12);
-  --backdrop: rgba(20, 20, 24, 0.26);
+    inset 0 -1px 0 rgba(15, 23, 42, 0.04);
+  --glow-accent: 0 16px 32px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-}
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
+/* ---------- 3. Reset & base ---------------------------------------------- */
+* { box-sizing: border-box; }
+*::selection { background: color-mix(in srgb, var(--accent) 36%, transparent); color: var(--text-strong); }
 
 html {
   min-height: 100%;
   background: var(--bg);
-  color-scheme: dark;
   -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -141,98 +198,94 @@ body {
   min-height: var(--tg-viewport-stable-height, 100dvh);
   background: var(--page-bg);
   color: var(--text);
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-    "Segoe UI", sans-serif;
-  font-feature-settings:
-    "kern" 1,
-    "liga" 1;
+  font-family: var(--font-text);
+  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   overscroll-behavior-y: none;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
 }
 
+/* Декоративные слои фона. Грид-сетка очень слабая, шум в верхней четверти. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(
-      circle at 50% -12%,
-      rgba(255, 255, 255, 0.09),
-      transparent 34%
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 38%);
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.82), transparent 82%);
+    radial-gradient(circle at 50% -8%, rgba(255, 255, 255, 0.06), transparent 38%);
 }
-
 body::after {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -1;
   pointer-events: none;
+  opacity: 0.18;
   background-image:
     linear-gradient(var(--hairline) 1px, transparent 1px),
     linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
-  background-size: 58px 58px;
-  mask-image: radial-gradient(circle at 50% 0%, #000 0%, transparent 68%);
-  opacity: 0.24;
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at 50% -10%, #000 0%, transparent 65%);
 }
 
-button,
-input {
+button, input, select, textarea {
   font: inherit;
+  font-family: var(--font-text);
 }
+button { -webkit-tap-highlight-color: transparent; }
 
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-button:focus-visible,
-input:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 70%, white);
+button:focus-visible, input:focus-visible, [role="button"]:focus-visible, a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 80%, white);
   outline-offset: 3px;
+  border-radius: var(--radius-xs);
 }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
+/* Tabular numbers для всего, что внутри метрик */
+.metric-value, .num, .tabular { font-variant-numeric: tabular-nums; }
 
+/* ---------- 4. Layout containers ----------------------------------------- */
 .page-shell {
-  width: min(1080px, 100%);
+  width: min(var(--container-max), 100%);
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top))
-    max(clamp(14px, 3vw, 26px), env(safe-area-inset-right))
-    calc(var(--bottom-nav-height) + 24px + env(safe-area-inset-bottom))
-    max(clamp(14px, 3vw, 26px), env(safe-area-inset-left));
-  animation: page-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(clamp(16px, 3vw, 28px), env(safe-area-inset-right))
+    calc(var(--bottom-nav-height) + 28px + env(safe-area-inset-bottom))
+    max(clamp(16px, 3vw, 28px), env(safe-area-inset-left));
+  animation: page-enter 360ms var(--ease-out) both;
 }
 
+.dashboard-section {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.dashboard-two-columns { grid-template-columns: 1fr; }
+
+/* ---------- 5. Bottom tabs (плавающий док) ------------------------------- */
 .bottom-tabs-shell {
-  position: fixed;
-  left: 50%;
-  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 6px);
+  position: fixed !important;
+  left: 50% !important;
+  right: auto;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 6px) !important;
   z-index: 80;
-  width: min(calc(100vw - 22px), 760px);
-  max-width: calc(100vw - 22px);
-  gap: 5px;
+  width: min(calc(100vw - 24px), 720px);
+  margin: 0 auto;
+  gap: 4px;
   padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 28px;
-  background: linear-gradient(
-    180deg,
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg,
     color-mix(in srgb, var(--nav-bg) 92%, transparent),
-    color-mix(in srgb, var(--bg-elevated) 74%, transparent)
-  );
-  box-shadow:
-    var(--inner-highlight),
-    0 22px 64px rgba(0, 0, 0, 0.28);
+    color-mix(in srgb, var(--bg-elevated) 80%, transparent));
+  box-shadow: var(--shadow-3), var(--inner-highlight);
   transform: translateX(-50%);
-  backdrop-filter: blur(34px) saturate(190%);
-  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  pointer-events: auto;
 }
 
 .bottom-tab-button {
@@ -242,159 +295,138 @@ button:disabled {
   place-items: center;
   gap: 4px;
   border: 0;
-  border-radius: 22px;
+  border-radius: calc(var(--radius-xl) - 8px);
   padding: 6px 4px;
   cursor: pointer;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease,
-    box-shadow 160ms ease;
-  touch-action: manipulation;
+  background: transparent;
+  color: var(--muted);
+  transition: background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out),
+              transform var(--dur-1) var(--ease-out);
 }
-
-.bottom-tab-button:active {
-  transform: scale(0.97);
+.bottom-tab-button:active { transform: scale(0.96); }
+.bottom-tab-button[data-active="true"] {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 14%, var(--surface-strong)),
+    color-mix(in srgb, var(--surface) 84%, transparent));
+  color: var(--text-strong);
+  box-shadow: var(--inner-highlight),
+    0 8px 22px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-
-.bottom-tab-icon {
-  font-size: 19px;
-  line-height: 1;
-}
-
+.bottom-tab-icon { font-size: 18px; line-height: 1; }
 .bottom-tab-label {
   max-width: 100%;
   overflow: hidden;
   font-size: 11px;
+  font-weight: 700;
   letter-spacing: -0.01em;
-  line-height: 1.05;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dashboard-section {
-  display: grid;
-  gap: 18px;
-  margin-bottom: 20px;
-}
-
-.dashboard-two-columns {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-.command-center-card {
-  display: grid;
-  gap: 14px;
-}
+/* ---------- 6. Hero / command center ------------------------------------- */
+.command-center-card { display: grid; gap: 18px; }
 
 .hero-card {
-  overflow: hidden;
   position: relative;
-  min-height: 0;
+  overflow: hidden;
   isolation: isolate;
-  padding: clamp(20px, 3.5vw, 32px) !important;
-  border-radius: 38px !important;
+  padding: clamp(22px, 3.4vw, 34px) !important;
+  border-radius: var(--radius-xl) !important;
 }
-
 .hero-card::before {
   content: "";
   position: absolute;
-  inset: 1px;
+  inset: 0;
   z-index: -1;
-  border-radius: 37px;
   background:
-    linear-gradient(120deg, rgba(10, 132, 255, 0.2), transparent 38%),
-    radial-gradient(
-      circle at 82% 20%,
-      rgba(99, 230, 190, 0.18),
-      transparent 25%
-    ),
-    radial-gradient(
-      circle at 16% 112%,
-      rgba(255, 181, 92, 0.12),
-      transparent 28%
-    );
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--aurora-1) 18%, transparent), transparent 36%),
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--aurora-3) 18%, transparent), transparent 36%),
+    radial-gradient(circle at 50% 110%, color-mix(in srgb, var(--aurora-2) 14%, transparent), transparent 42%);
 }
-
 .hero-card::after {
   content: "";
   position: absolute;
-  inset: auto -16% -36% auto;
-  width: 320px;
-  height: 320px;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle,
-    rgba(10, 132, 255, 0.18),
-    transparent 70%
-  );
-  filter: blur(2px);
+  inset: auto -24% -42% auto;
+  width: 360px;
+  height: 360px;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(circle, color-mix(in srgb, var(--aurora-2) 16%, transparent), transparent 70%);
+  filter: blur(8px);
 }
 
 .eyebrow {
+  font-family: var(--font-display);
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.18em;
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .hero-topline {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 18px;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .hero-title {
-  max-width: 100%;
-  width: fit-content;
-  margin: 8px 0 0;
-  padding-right: 0.12em;
-  padding-bottom: 0.04em;
-  font-size: clamp(3rem, 11vw, 5.85rem);
+  margin: 10px 0 0;
+  padding-right: 0.08em;
+  padding-bottom: 0.03em;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 9vw, 4.4rem);
   line-height: 0.94;
-  letter-spacing: -0.058em;
-  font-weight: 900;
+  letter-spacing: -0.05em;
+  font-weight: 800;
   white-space: nowrap;
-  background: linear-gradient(
-    180deg,
-    var(--text) 30%,
-    color-mix(in srgb, var(--text) 62%, var(--accent))
-  );
+  background: linear-gradient(180deg, var(--text-strong) 30%, color-mix(in srgb, var(--text) 52%, var(--accent)));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
+/* metrics row — 2 / 3 / 6 в зависимости от ширины */
 .command-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-
 .command-metric {
-  min-height: 104px;
-  border-radius: 24px !important;
+  min-height: 100px;
+  padding: 16px !important;
+  border-radius: var(--radius-md) !important;
+  background: color-mix(in srgb, var(--surface) 92%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent) !important;
+  transition: transform var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
 }
-
-.command-metric > div {
-  min-width: 0;
-  gap: 6px !important;
-}
-
+.command-metric > div { gap: 6px !important; min-width: 0; }
 .command-metric > div > div:first-child {
-  font-weight: 760;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted) !important;
   line-height: 1.2;
 }
-
 .command-metric > div > div:nth-child(2) {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: clamp(1.15rem, 3.4vw, 1.45rem) !important;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
   overflow-wrap: anywhere;
-  line-height: 1.16;
 }
-
 .command-metric > div > div:nth-child(3) {
-  line-height: 1.25;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted-strong);
 }
 
 .hero-subtitle {
@@ -403,196 +435,168 @@ button:disabled {
   line-height: 1.6;
 }
 
+/* ---------- 7. Care now / next-step focus card --------------------------- */
 .care-now-card {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   margin-top: 4px;
-  padding: clamp(17px, 3vw, 24px);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: 32px;
+  padding: clamp(18px, 3vw, 24px);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--radius-lg);
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--accent) 18%, transparent),
-      transparent 40%
-    ),
-    color-mix(in srgb, var(--surface-strong) 72%, transparent);
-  box-shadow:
-    var(--inner-highlight),
-    0 22px 48px rgba(0, 0, 0, 0.15);
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-2) 16%, transparent), transparent 42%),
+    color-mix(in srgb, var(--surface-strong) 78%, transparent);
+  box-shadow: var(--shadow-2), var(--inner-highlight);
   overflow: hidden;
-  position: relative;
 }
-
 .care-now-card::after {
   content: "";
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.32),
-    transparent
-  );
-  opacity: 0.64;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 24%, transparent), transparent);
+  opacity: 0.5;
 }
-
 .care-now-card.tone-warm {
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--accent-3) 22%, transparent),
-      transparent 42%
-    ),
-    color-mix(in srgb, var(--surface-strong) 74%, transparent);
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-4) 22%, transparent), transparent 44%),
+    color-mix(in srgb, var(--surface-strong) 76%, transparent);
 }
-
 .care-now-card.tone-calm {
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, #64d2ff 22%, transparent),
-      transparent 42%
-    ),
-    color-mix(in srgb, var(--surface-strong) 74%, transparent);
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-3) 20%, transparent), transparent 44%),
+    color-mix(in srgb, var(--surface-strong) 76%, transparent);
 }
-
 .care-now-card.tone-danger {
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--danger) 20%, transparent),
-      transparent 42%
-    ),
-    color-mix(in srgb, var(--surface-strong) 74%, transparent);
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--danger) 22%, transparent), transparent 44%),
+    color-mix(in srgb, var(--surface-strong) 76%, transparent);
 }
-
-.care-now-card.info-only {
-  grid-template-columns: minmax(0, 1fr);
-}
+.care-now-card.info-only { grid-template-columns: 1fr; }
 
 .care-now-kicker {
+  font-family: var(--font-display);
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 760;
-  letter-spacing: 0.09em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-
 .care-now-title {
-  margin-top: 6px;
-  font-size: clamp(1.55rem, 5vw, 2.35rem);
-  font-weight: 900;
-  letter-spacing: -0.055em;
-  line-height: 1.02;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4.8vw, 2.05rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
-
 .care-now-body {
   max-width: 560px;
   margin-top: 8px;
   color: var(--muted-strong);
-  line-height: 1.45;
+  line-height: 1.55;
+  font-size: 14px;
 }
 
+/* ---------- 8. Sync panel / status pill --------------------------------- */
 .sync-panel {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  margin-top: 0;
-  padding: 9px 10px 9px 12px;
+  padding: 9px 10px 9px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   color: var(--muted-strong);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   box-shadow: var(--inner-highlight);
 }
-
 .sync-panel > div {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
-
 .sync-panel button {
   min-height: 36px;
   border: 0;
-  border-radius: 999px;
-  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  padding: 0 14px;
   background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .sync-dot {
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--accent-2);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-2) 16%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--good);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--good) 18%, transparent);
+  animation: pulse-dot 2.4s var(--ease-in-out) infinite;
 }
-
 .sync-dot[data-state="offline"] {
   background: var(--danger);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 16%, transparent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 18%, transparent);
 }
-
 .sync-dot[data-state="conflict"] {
-  background: var(--accent-3);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-3) 18%, transparent);
+  background: var(--warn);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--warn) 20%, transparent);
 }
 
 .sync-warning {
   margin-top: 10px;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent-3) 30%, transparent);
-  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  border-radius: var(--radius-sm);
   background: var(--warn-soft);
   color: var(--text);
   font-size: 13px;
-  font-weight: 700;
-  line-height: 1.45;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
-.growth-card {
-  display: grid;
-  gap: 14px;
-}
+/* ---------- 9. Growth chart cards ---------------------------------------- */
+.growth-card { display: grid; gap: 16px; }
 
 .growth-summary-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
-
 .growth-summary-tile {
   display: grid;
   gap: 6px;
-  min-height: 82px;
+  min-height: 86px;
   align-content: center;
-  border-radius: 22px !important;
+  border-radius: var(--radius-md) !important;
+  padding: 14px !important;
+  background: color-mix(in srgb, var(--surface) 92%, transparent) !important;
 }
-
 .growth-summary-tile span {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 760;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
 }
-
 .growth-summary-tile strong {
-  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
   font-size: clamp(1.15rem, 4vw, 1.55rem);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .growth-panel-grid {
@@ -600,34 +604,19 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-
 .growth-panel {
   display: grid;
   gap: 12px;
   overflow: hidden;
-  border-radius: 28px !important;
-  padding: 14px !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 16px !important;
   background:
-    radial-gradient(
-      circle at 12% 0%,
-      color-mix(in srgb, var(--growth-accent) 18%, transparent),
-      transparent 42%
-    ),
-    color-mix(in srgb, var(--surface) 88%, transparent) !important;
-  border-color: color-mix(
-    in srgb,
-    var(--growth-accent) 24%,
-    var(--border)
-  ) !important;
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--growth-accent) 18%, transparent), transparent 44%),
+    color-mix(in srgb, var(--surface) 90%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--growth-accent) 26%, var(--border)) !important;
 }
-
-.growth-panel-weight {
-  --growth-accent: var(--accent-3);
-}
-
-.growth-panel-height {
-  --growth-accent: var(--accent-2);
-}
+.growth-panel-weight { --growth-accent: var(--aurora-4); }
+.growth-panel-height { --growth-accent: var(--aurora-1); }
 
 .growth-panel-head {
   display: flex;
@@ -635,23 +624,23 @@ button:disabled {
   align-items: start;
   gap: 10px;
 }
-
 .growth-panel-label {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 820;
-  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
 .growth-panel-value {
-  margin-top: 5px;
-  font-size: clamp(1.65rem, 5vw, 2.35rem);
-  font-weight: 900;
-  line-height: 0.95;
-  letter-spacing: -0.06em;
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.55rem, 5vw, 2.15rem);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
 }
-
 .growth-panel-meta {
   display: flex;
   flex-wrap: wrap;
@@ -659,113 +648,87 @@ button:disabled {
   justify-content: space-between;
   color: var(--muted-strong);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 600;
 }
-
 .growth-panel-meta span:first-child {
-  color: color-mix(in srgb, var(--growth-accent) 76%, var(--text));
+  color: color-mix(in srgb, var(--growth-accent) 78%, var(--text));
+  font-weight: 700;
 }
 
 .growth-mini-chart-wrap {
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-md);
   padding: 8px;
   background: color-mix(in srgb, var(--bg) 18%, transparent);
 }
-
-.growth-mini-chart {
-  width: 100%;
-  min-height: 112px;
-  display: block;
-}
-
-.growth-mini-chart line {
-  stroke: color-mix(in srgb, var(--border) 64%, transparent);
-  stroke-width: 1;
-}
-
+.growth-mini-chart { width: 100%; min-height: 116px; display: block; }
+.growth-mini-chart line { stroke: color-mix(in srgb, var(--border) 60%, transparent); stroke-width: 1; }
 .growth-mini-chart polyline {
   fill: none;
   stroke: var(--growth-accent);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 5;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--growth-accent) 40%, transparent));
 }
-
 .growth-mini-chart circle {
   fill: var(--growth-accent);
   stroke: var(--bg);
   stroke-width: 2;
 }
-
 .growth-axis-row {
   display: flex;
   justify-content: space-between;
   gap: 8px;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 760;
+  font-weight: 600;
 }
-
 .growth-panel-empty {
-  min-height: 126px;
+  min-height: 130px;
   display: grid;
   place-items: center;
   border: 1px dashed color-mix(in srgb, var(--border) 86%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-md);
   color: var(--muted-strong);
   text-align: center;
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
+  padding: 12px;
 }
 
-.status-pills,
-.actor-toggle {
+/* ---------- 10. Status pills, actor toggle, role settings --------------- */
+.status-pills, .actor-toggle {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
-
-.actor-toggle {
-  margin-top: 18px;
-}
-
-.actor-toggle.compact {
-  margin-top: 0;
-  justify-content: flex-end;
-}
+.actor-toggle { margin-top: 18px; }
+.actor-toggle.compact { margin-top: 0; justify-content: flex-end; }
 
 .actor-chip {
   border: 1px solid var(--border);
-  border-radius: 999px;
-  min-height: 50px;
+  border-radius: var(--radius-pill);
+  min-height: 48px;
   padding: 0 18px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
   color: var(--muted-strong);
   cursor: pointer;
   box-shadow: var(--inner-highlight);
-  font-weight: 780;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out);
 }
-
-.actor-chip:active {
-  transform: scale(0.98);
-}
-
+.actor-chip:active { transform: scale(0.97); }
 .actor-chip.active {
-  background: linear-gradient(
-    180deg,
-    var(--accent),
-    color-mix(in srgb, var(--accent) 74%, #000)
-  );
-  color: #ffffff;
-  border-color: color-mix(in srgb, var(--accent) 56%, transparent);
-  box-shadow:
-    var(--inner-highlight),
-    0 14px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+  background: var(--accent-gradient);
+  color: var(--primary-text);
+  border-color: transparent;
+  box-shadow: var(--inner-highlight), var(--glow-accent);
 }
 
 .role-settings-card {
@@ -773,24 +736,23 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-top: 0;
-  padding: 15px;
+  padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 30px;
-  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
   box-shadow: var(--inner-highlight);
 }
-
 .role-settings-title {
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
-
 .role-settings-copy {
   margin-top: 4px;
   color: var(--muted-strong);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .theme-switch {
@@ -798,90 +760,61 @@ button:disabled {
   min-height: 44px;
   padding: 4px;
   gap: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  background: rgba(118, 118, 128, 0.18);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
   box-shadow: var(--inner-highlight);
 }
-
 .theme-option {
   border: 0;
   min-height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted-strong);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 750;
-  transition:
-    transform 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
+  font-weight: 700;
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out);
 }
-
-.theme-option:active {
-  transform: scale(0.97);
-}
-
+.theme-option:active { transform: scale(0.97); }
 .theme-option.active {
-  background: var(--surface-strong);
-  color: var(--text);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.22),
-    0 8px 18px rgba(0, 0, 0, 0.1);
+  background: var(--surface-pressed);
+  color: var(--text-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2),
+              0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
+/* ---------- 11. Home focus tiles & log grids ---------------------------- */
 .home-focus-grid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 18px;
 }
-
 .focus-tile {
   position: relative;
-  min-height: 128px;
+  min-height: 132px;
   overflow: hidden;
-  border-radius: 28px !important;
+  border-radius: var(--radius-lg) !important;
 }
-
 .focus-tile::after {
   content: "";
   position: absolute;
-  right: -34px;
-  bottom: -44px;
-  width: 128px;
-  height: 128px;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle,
+  right: -36px;
+  bottom: -48px;
+  width: 132px;
+  height: 132px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(circle,
     color-mix(in srgb, var(--focus-color, var(--accent)) 22%, transparent),
-    transparent 70%
-  );
+    transparent 70%);
 }
-
-.focus-feeding {
-  --focus-color: #64d2ff;
-}
-
-.focus-sleep {
-  --focus-color: #0a84ff;
-}
-
-.focus-growth {
-  --focus-color: #63e6be;
-}
-
-.home-focus-grid > div,
-.stats-grid > div,
-.timers-grid > div,
-.metrics-grid > div {
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    background 180ms ease;
-}
+.focus-feeding { --focus-color: var(--aurora-1); }
+.focus-sleep { --focus-color: var(--aurora-3); }
+.focus-growth { --focus-color: var(--aurora-2); }
 
 @media (hover: hover) {
   .home-focus-grid > div:hover,
@@ -893,161 +826,131 @@ button:disabled {
   }
 }
 
-.stats-grid,
-.actions-grid,
-.timers-grid,
-.metrics-grid {
+.stats-grid, .actions-grid, .timers-grid, .metrics-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
+.stats-grid { grid-template-columns: 1fr; }
+.actions-grid, .metrics-grid { grid-template-columns: 1fr; }
 
-.stats-grid {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-.actions-grid,
-.metrics-grid {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-.log-command-card {
-  display: grid;
-  gap: 18px;
-}
-
+.log-command-card { display: grid; gap: 18px; }
 .log-primary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-
 .log-secondary-panel {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
-  border-radius: 28px;
-  padding: 14px;
+  border-radius: var(--radius-lg);
+  padding: 16px;
   background: color-mix(in srgb, var(--surface) 78%, transparent);
   box-shadow: var(--inner-highlight);
 }
-
 .log-secondary-copy {
   color: var(--muted-strong);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
-
 .log-secondary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
-
 .log-secondary-button {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   place-items: center;
-  min-height: 74px;
+  min-height: 80px;
   border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 20px;
-  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  padding: 12px 8px;
   background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
   color: var(--text);
   cursor: pointer;
   text-align: center;
   box-shadow: var(--inner-highlight);
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
 }
-
-.log-secondary-button span {
-  font-size: 22px;
+.log-secondary-button:active { transform: scale(0.97); }
+.log-secondary-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
 }
-
+.log-secondary-button span { font-size: 22px; line-height: 1; }
 .log-secondary-button strong {
   overflow: hidden;
   max-width: 100%;
-  font-size: 13px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.timers-grid {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+.timers-grid { grid-template-columns: 1fr; }
+.timers-grid > div, .metrics-grid > div {
+  min-height: 108px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  box-shadow: var(--inner-highlight);
+  transition: transform var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
 }
 
-.stack-list,
-.timeline-list,
-.preset-list {
+.stack-list, .timeline-list, .preset-list {
   display: grid;
   gap: 12px;
 }
 
-.timers-grid > div,
-.metrics-grid > div {
-  min-height: 104px;
-  padding: 16px;
-  border-radius: 26px;
-  background:
-    radial-gradient(
-      circle at 16% 0%,
-      color-mix(in srgb, var(--accent) 11%, transparent),
-      transparent 46%
-    ),
-    color-mix(in srgb, var(--surface) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  box-shadow: var(--inner-highlight);
-}
-
+/* ---------- 12. Period tabs + summary fields --------------------------- */
 .period-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin: 0 0 14px;
   padding: 4px;
   overflow-x: auto;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  border-radius: 999px;
-  background: rgba(118, 118, 128, 0.16);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
   box-shadow: var(--inner-highlight);
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
 }
-
-.period-tabs::-webkit-scrollbar {
-  display: none;
-}
-
+.period-tabs::-webkit-scrollbar { display: none; }
 .period-tab {
   flex: 0 0 auto;
   scroll-snap-align: start;
-  min-height: 40px;
+  min-height: 38px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 14px;
   background: transparent;
   color: var(--muted-strong);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 750;
-  transition:
-    transform 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out);
 }
-
-.period-tab:active {
-  transform: scale(0.97);
-}
-
+.period-tab:active { transform: scale(0.97); }
 .period-tab.active {
-  background: linear-gradient(
-    180deg,
-    var(--surface-strong),
-    color-mix(in srgb, var(--surface) 84%, transparent)
-  );
-  color: var(--text);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.22),
-    0 8px 18px rgba(0, 0, 0, 0.09);
+  background: var(--surface-pressed);
+  color: var(--text-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18),
+              0 6px 14px rgba(0, 0, 0, 0.10);
 }
 
 .summary-date-field {
@@ -1056,76 +959,63 @@ button:disabled {
   margin: 14px 0 8px;
   color: var(--muted-strong);
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 600;
 }
-
 .summary-date-field input {
   width: 100%;
-  min-height: 48px;
+  min-height: 50px;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-sm);
   padding: 0 14px;
   background: var(--field-bg);
   color: var(--text);
-  color-scheme: dark;
-  font-weight: 760;
+  font-family: var(--font-text);
+  font-weight: 600;
 }
-
-:root[data-theme="light"] .summary-date-field input {
-  color-scheme: light;
-}
-
+:root[data-theme="light"] .summary-date-field input { color-scheme: light; }
 .summary-date-copy {
   margin: 0 0 14px;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-.filter-panel,
-.export-filter-grid {
+/* ---------- 13. Filters & export --------------------------------------- */
+.filter-panel, .export-filter-grid {
   display: grid;
   gap: 12px;
   margin-bottom: 14px;
 }
-
-.export-command-card {
-  display: grid;
-  gap: 16px;
-}
+.export-command-card { display: grid; gap: 16px; }
 
 .export-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: 18px;
   align-items: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
-  border-radius: 30px;
-  padding: clamp(16px, 3vw, 22px);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: var(--radius-lg);
+  padding: clamp(18px, 3vw, 24px);
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--accent) 18%, transparent),
-      transparent 42%
-    ),
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-1) 16%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--aurora-3) 14%, transparent), transparent 50%),
     color-mix(in srgb, var(--surface-strong) 78%, transparent);
-  box-shadow: var(--inner-highlight);
+  box-shadow: var(--shadow-2), var(--inner-highlight);
 }
-
 .export-hero-title {
-  font-size: clamp(1.45rem, 5vw, 2.1rem);
-  font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 4.6vw, 1.95rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
 }
-
 .export-hero-copy {
   max-width: 620px;
   margin-top: 8px;
   color: var(--muted-strong);
-  line-height: 1.5;
+  line-height: 1.55;
+  font-size: 14px;
 }
-
 .export-preview-row {
   display: flex;
   flex-wrap: wrap;
@@ -1138,51 +1028,43 @@ button:disabled {
   flex-wrap: wrap;
   gap: 8px;
 }
-
 .filter-chip {
-  min-height: 40px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 999px;
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-pill);
   padding: 0 13px;
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   color: var(--muted-strong);
   cursor: pointer;
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
+  letter-spacing: -0.005em;
   box-shadow: var(--inner-highlight);
-  transition:
-    transform 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease;
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out);
 }
-
-.filter-chip:active {
-  transform: scale(0.97);
-}
-
+.filter-chip:active { transform: scale(0.97); }
 .filter-chip.active {
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: color-mix(in srgb, var(--accent) 18%, var(--surface-strong));
-  color: color-mix(in srgb, var(--text) 90%, var(--accent));
+  color: var(--text-strong);
 }
-
 .filter-title {
   margin-bottom: 10px;
-  font-size: 14px;
-  font-weight: 900;
-  color: var(--muted-strong);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
 }
 
-.feed-list {
-  display: grid;
-  gap: 14px;
-}
-
-.feed-day-group {
-  display: grid;
-  gap: 8px;
-}
-
+/* ---------- 14. Feed (timeline) ---------------------------------------- */
+.feed-list { display: grid; gap: 16px; }
+.feed-day-group { display: grid; gap: 8px; }
 .feed-day-header {
   position: sticky;
   top: max(8px, env(safe-area-inset-top));
@@ -1190,198 +1072,196 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 7px 11px;
+  padding: 8px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
   color: var(--muted-strong);
-  backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  font-family: var(--font-display);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 700;
   text-transform: capitalize;
+  letter-spacing: -0.01em;
   box-shadow: var(--inner-highlight);
 }
 
 .feed-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: start;
-  padding: 12px !important;
+  padding: 14px !important;
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--accent) 8%, transparent),
-      transparent 48%
-    ),
-    color-mix(in srgb, var(--surface) 92%, transparent);
-  border-radius: 22px !important;
-  box-shadow:
-    var(--inner-highlight),
-    0 12px 30px rgba(0, 0, 0, 0.08);
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 50%),
+    color-mix(in srgb, var(--surface) 92%, transparent) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-1), var(--inner-highlight);
+  transition: transform var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .feed-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+  }
 }
 
 .feed-card-icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 15px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
   color: #061018;
-  font-size: 17px;
-  box-shadow: var(--inner-highlight);
+  font-size: 18px;
+  box-shadow: var(--inner-highlight),
+              0 6px 14px rgba(0, 0, 0, 0.18);
 }
 
-.feed-card-main {
-  min-width: 0;
-}
-
+.feed-card-main { min-width: 0; }
 .feed-card-top {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
 }
-
 .feed-card-title {
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 840;
+  font-weight: 800;
   line-height: 1.35;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
+  color: var(--text-strong);
 }
-
 .feed-card-meta {
   margin-top: 4px;
   color: var(--muted-strong);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
+.feed-card-badges { margin-top: 10px; }
 
-.feed-card-badges {
-  margin-top: 8px;
-}
-
+/* ---------- 15. Bottom sheet ------------------------------------------- */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  padding: 14px max(12px, env(safe-area-inset-right))
-    max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  padding:
+    14px
+    max(12px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
   background:
-    radial-gradient(
-      circle at 50% 100%,
-      color-mix(in srgb, var(--accent) 12%, transparent),
-      transparent 42%
-    ),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 44%),
     var(--backdrop);
-  backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(160%);
   display: grid;
   align-items: end;
   z-index: 120;
+  animation: fade-in var(--dur-2) var(--ease-out) both;
 }
 
 .sheet-panel {
   position: relative;
   width: min(720px, 100%);
   max-height: calc(
-    var(--tg-viewport-height, var(--tg-viewport-stable-height, 100dvh)) -
-      max(24px, env(safe-area-inset-top)) -
-      max(18px, env(safe-area-inset-bottom))
+    var(--tg-viewport-height, var(--tg-viewport-stable-height, 100dvh))
+    - max(24px, env(safe-area-inset-top))
+    - max(18px, env(safe-area-inset-bottom))
   );
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-padding-bottom: 96px;
   margin: 0 auto;
-  border-radius: 38px 38px 26px 26px;
-  padding: 18px;
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-md) var(--radius-md);
+  padding: 20px;
   background: var(--sheet-bg);
   border: 1px solid var(--border);
-  box-shadow:
-    var(--inner-highlight),
-    0 34px 98px rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(30px) saturate(180%);
-  animation: sheet-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  box-shadow: var(--shadow-3), var(--inner-highlight);
+  backdrop-filter: blur(28px) saturate(180%);
+  animation: sheet-enter 320ms var(--ease-out) both;
 }
-
 .sheet-panel::before {
   content: "";
   display: block;
-  width: 48px;
-  height: 5px;
-  margin: 0 auto 16px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 32%, transparent);
+  width: 44px;
+  height: 4px;
+  margin: 0 auto 18px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--muted) 38%, transparent);
 }
-
 .sheet-header {
   position: sticky;
-  top: -18px;
+  top: -20px;
   z-index: 4;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: start;
   margin: -2px -2px 14px;
-  padding: 2px 2px 14px;
+  padding: 4px 2px 16px;
   background: linear-gradient(180deg, var(--sheet-bg), transparent);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(16px);
 }
-
 .sheet-header h3 {
   margin: 6px 0 0;
-  font-size: clamp(1.75rem, 7vw, 2.35rem);
-  letter-spacing: -0.055em;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 6.4vw, 2.2rem);
+  letter-spacing: -0.045em;
   line-height: 0.98;
+  font-weight: 800;
 }
 
+/* ---------- 16. Form fields ------------------------------------------- */
 .field {
   display: grid;
   gap: 8px;
   margin-top: 14px;
 }
-
 .field span {
   color: var(--muted-strong);
-  font-size: 14px;
-  font-weight: 650;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
 }
-
 .field input {
-  min-height: 58px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 20px;
+  min-height: 56px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
   padding: 0 16px;
   background: var(--field-bg);
   color: var(--text);
   outline: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease;
+  font-family: var(--font-text);
+  font-size: 16px;
+  font-weight: 600;
+  transition: border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
 }
-
 .field input:focus {
-  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent),
-    var(--inner-highlight);
+  background: var(--field-bg-focus);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent),
+              var(--inner-highlight);
 }
-
 .field input[aria-invalid="true"] {
-  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
 }
 
 .field-hint {
   margin-top: 12px;
-  border-radius: 18px;
-  padding: 11px 13px;
-  background: color-mix(in srgb, var(--surface-strong) 58%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-strong) 60%, transparent);
   color: var(--muted-strong);
   font-size: 13px;
-  font-weight: 700;
-  line-height: 1.45;
+  font-weight: 600;
+  line-height: 1.5;
 }
-
 .field-hint.error {
   background: var(--danger-soft);
   color: var(--danger-text);
@@ -1392,67 +1272,46 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-
-.entry-date-time-grid {
-  align-items: end;
-}
+.entry-date-time-grid { align-items: end; }
 
 .sheet-footer {
   position: sticky;
-  bottom: -18px;
+  bottom: -20px;
   z-index: 4;
   margin: 18px -2px -2px;
-  padding: 14px 2px 2px;
+  padding: 14px 2px 4px;
   background: linear-gradient(0deg, var(--sheet-bg), transparent);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(16px);
 }
+.sheet-footer button { width: 100%; }
 
-.sheet-footer button {
-  width: 100%;
-}
-
+/* ---------- 17. Preset cards & quick-delete --------------------------- */
 .preset-card {
+  position: relative;
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 26px;
-  padding: 17px 18px;
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
   width: 100%;
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--accent) 7%, transparent),
-      transparent 34%
-    ),
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 36%),
     color-mix(in srgb, var(--surface) 88%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
   box-shadow: var(--inner-highlight);
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
 }
-
-.preset-card.with-delete {
-  padding-right: 62px;
-}
-
-.preset-card:active {
-  transform: scale(0.985);
-}
-
+.preset-card.with-delete { padding-right: 64px; }
+.preset-card:active { transform: scale(0.985); }
 .preset-card.active {
   background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--accent) 24%, transparent),
-      transparent 42%
-    ),
-    color-mix(in srgb, var(--accent) 18%, var(--surface-strong));
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 44%),
+    color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
   border-color: color-mix(in srgb, var(--accent) 42%, transparent);
-  box-shadow:
-    var(--inner-highlight),
-    0 18px 36px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: var(--inner-highlight),
+    0 18px 36px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .preset-row {
@@ -1464,56 +1323,47 @@ button:disabled {
 
 .quick-delete-button {
   position: absolute;
-  top: 13px;
-  right: 13px;
+  top: 14px;
+  right: 14px;
   z-index: 2;
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--border));
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--danger) 26%, var(--border));
+  border-radius: var(--radius-pill);
   padding: 0;
-  background: color-mix(in srgb, var(--danger-soft) 74%, var(--surface));
+  background: color-mix(in srgb, var(--danger-soft) 78%, var(--surface));
   color: var(--danger-text);
   cursor: pointer;
   font-size: 20px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
   box-shadow: var(--inner-highlight);
   touch-action: manipulation;
-  transition:
-    transform 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease;
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
 }
+.quick-delete-button:active { transform: scale(0.92); }
+.quick-delete-button:disabled { opacity: 0.55; }
 
-.quick-delete-button:active {
-  transform: scale(0.94);
-}
-
-.quick-delete-button:disabled {
-  opacity: 0.55;
-}
-
+/* ---------- 18. Access denied / loading / install banner -------------- */
 .access-card {
   background:
-    radial-gradient(
-      circle at 50% 0%,
-      color-mix(in srgb, var(--danger) 14%, transparent),
-      transparent 34%
-    ),
-    var(--card-bg);
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--danger) 16%, transparent), transparent 36%),
+    var(--card-bg) !important;
 }
 
 .error-banner {
   margin-bottom: 16px;
   padding: 14px 16px;
-  border-radius: 20px;
+  border-radius: var(--radius-sm);
   background: var(--danger-soft);
-  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--danger-text);
   box-shadow: var(--inner-highlight);
+  font-weight: 600;
 }
 
 .install-shortcut-card {
@@ -1528,188 +1378,151 @@ button:disabled {
   width: min(560px, calc(100vw - 28px));
   margin: 0 auto;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-lg);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--surface-strong) 92%, transparent),
-      color-mix(in srgb, var(--surface) 82%, transparent)
-    ),
-    var(--surface);
-  box-shadow: var(--shadow), var(--inner-highlight);
-  backdrop-filter: blur(22px) saturate(1.4);
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-strong) 92%, transparent),
+                          color-mix(in srgb, var(--surface) 80%, transparent));
+  box-shadow: var(--shadow-2), var(--inner-highlight);
+  backdrop-filter: blur(22px) saturate(180%);
+  animation: slide-up 360ms var(--ease-out) both;
 }
-
 .install-shortcut-icon {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #3b82f6, #111827 70%);
-  color: #fff;
-  font-size: 22px;
-  font-weight: 950;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 10px 26px rgba(30, 64, 175, 0.28);
+  border-radius: var(--radius-sm);
+  background: var(--accent-gradient);
+  color: var(--primary-text);
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: var(--inner-highlight),
+              0 10px 24px color-mix(in srgb, var(--accent) 28%, transparent);
 }
-
-.install-shortcut-content {
-  min-width: 0;
-  flex: 1;
-}
-
+.install-shortcut-content { min-width: 0; flex: 1; }
 .install-shortcut-title {
-  color: var(--text);
+  color: var(--text-strong);
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -0.01em;
 }
-
 .install-shortcut-copy {
   margin-top: 3px;
   color: var(--muted-strong);
   font-size: 12px;
-  font-weight: 650;
-  line-height: 1.35;
+  font-weight: 600;
+  line-height: 1.4;
 }
-
 .install-shortcut-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
 }
-
-.install-shortcut-primary,
-.install-shortcut-dismiss {
+.install-shortcut-primary, .install-shortcut-dismiss {
   border: 0;
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  font-weight: 900;
-  transition:
-    transform 150ms ease,
-    opacity 150ms ease;
+  font-family: var(--font-display);
+  font-weight: 800;
+  transition: transform var(--dur-1) var(--ease-out),
+              opacity var(--dur-2) var(--ease-out);
 }
-
 .install-shortcut-primary {
   min-height: 42px;
-  padding: 0 14px;
-  border-radius: 999px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
   background: var(--accent-gradient);
-  color: #07111f;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--primary-text);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 26%, transparent);
 }
-
 .install-shortcut-dismiss {
   display: grid;
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
 }
-
-.install-shortcut-primary:active,
-.install-shortcut-dismiss:active {
-  transform: scale(0.96);
-}
-
-.install-shortcut-primary:disabled {
-  cursor: wait;
-  opacity: 0.68;
-}
-
-.loading-copy {
-  text-align: center;
-  font-size: 18px;
-  color: var(--muted-strong);
-}
+.install-shortcut-primary:active, .install-shortcut-dismiss:active { transform: scale(0.96); }
+.install-shortcut-primary:disabled { cursor: wait; opacity: 0.68; }
 
 .app-loading-card {
-  min-height: min(
-    360px,
-    calc(var(--tg-viewport-stable-height, 100dvh) - 120px)
-  );
+  min-height: min(360px, calc(var(--tg-viewport-stable-height, 100dvh) - 120px));
   display: grid;
   place-items: center;
   align-content: center;
   gap: 16px;
   text-align: center;
-  backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
-
+.loading-copy {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.015em;
+}
 .loading-hint {
   max-width: 420px;
   color: var(--muted);
   line-height: 1.55;
+  font-size: 14px;
 }
-
 .loading-spinner {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
   border: 3px solid color-mix(in srgb, var(--accent) 16%, transparent);
   border-top-color: var(--accent);
   animation: spin 850ms linear infinite;
 }
-
 .empty-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
   background: var(--danger-soft);
   color: var(--danger-text);
+  font-family: var(--font-display);
   font-weight: 800;
+  font-size: 18px;
   box-shadow: var(--inner-highlight);
 }
+.retry-row { width: min(280px, 100%); }
+.retry-row button { width: 100%; }
 
-.retry-row {
-  width: min(260px, 100%);
-}
-
-.retry-row button {
-  width: 100%;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+/* ---------- 19. Animations -------------------------------------------- */
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes page-enter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-
 @keyframes sheet-enter {
-  from {
-    opacity: 0;
-    transform: translateY(22px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(28px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
@@ -1717,305 +1530,2380 @@ button:disabled {
   }
 }
 
+/* ---------- 20. Responsive (legacy блок — оставлен для совместимости) -- */
+/* Новая адаптивная система живёт в блоке v3.1 ниже */
+
+
+/* ==========================================================================
+   v2.1 — Кормление за день, мульти-метрики на главной, удаление, prim/secondary
+   ========================================================================== */
+
+.today-feeding-card {
+  display: grid;
+  gap: 18px;
+}
+
+.today-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 560px) {
+  .today-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.today-stat {
+  position: relative;
+  overflow: hidden;
+  padding: 18px !important;
+  border-radius: var(--radius-lg) !important;
+  display: grid;
+  gap: 8px;
+  align-content: space-between;
+  min-height: 132px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent) !important;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-strong) 78%, transparent) !important;
+}
+.today-stat[data-tone="aurora"] {
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-2) 22%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-strong) 80%, transparent) !important;
+  border-color: color-mix(in srgb, var(--aurora-2) 30%, var(--border)) !important;
+}
+.today-stat[data-tone="mint"] {
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-1) 22%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-strong) 80%, transparent) !important;
+  border-color: color-mix(in srgb, var(--aurora-1) 30%, var(--border)) !important;
+}
+.today-stat[data-tone="violet"] {
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-3) 22%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-strong) 80%, transparent) !important;
+  border-color: color-mix(in srgb, var(--aurora-3) 30%, var(--border)) !important;
+}
+
+.today-stat-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.today-stat-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.1rem, 7vw, 2.85rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  color: var(--text-strong);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.today-stat-unit {
+  font-family: var(--font-display);
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--muted-strong);
+}
+.today-stat-helper {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-stats-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 560px) {
+  .today-stats-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.today-stat-mini {
+  padding: 14px !important;
+  border-radius: var(--radius-md) !important;
+  display: grid;
+  gap: 4px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+}
+.today-stat-mini-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.today-stat-mini-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.35rem, 4.4vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--text-strong);
+}
+.today-stat-mini-helper {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* feed card: actions row + delete button */
+.feed-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.feed-card-delete {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger-soft) 70%, var(--surface));
+  color: var(--danger-text);
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--border));
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--inner-highlight);
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
+}
+.feed-card-delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger-soft) 90%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+.feed-card-delete:active:not(:disabled) { transform: scale(0.94); }
+.feed-card-delete:disabled { opacity: 0.55; cursor: progress; }
+
+/* confirm dialog */
+.confirm-panel {
+  position: relative;
+  width: min(440px, 100%);
+  margin: 0 auto;
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  background: var(--sheet-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3), var(--inner-highlight);
+  display: grid;
+  gap: 8px;
+  animation: sheet-enter 280ms var(--ease-out) both;
+}
+.confirm-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 5.4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+.confirm-summary {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-strong) 60%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.confirm-meta {
+  margin-top: 4px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.confirm-actions {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.confirm-actions > button { width: 100%; }
+
+
+/* ==========================================================================
+   v2.2 — Тоггл «Сменили подгузник»
+   ========================================================================== */
+
+.diaper-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: var(--inner-highlight);
+  transition: background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              transform var(--dur-1) var(--ease-out);
+}
+.diaper-toggle:active { transform: scale(0.99); }
+
+.diaper-toggle.active {
+  border-color: color-mix(in srgb, var(--aurora-2) 36%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-1) 14%, transparent), transparent 44%),
+    color-mix(in srgb, var(--aurora-2) 12%, var(--surface-strong));
+  box-shadow:
+    var(--inner-highlight),
+    0 14px 28px color-mix(in srgb, var(--aurora-2) 16%, transparent);
+}
+
+.diaper-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 56px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  transition: background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
+  flex: 0 0 auto;
+}
+.diaper-toggle.active .diaper-toggle-track {
+  background: var(--accent-gradient);
+  border-color: transparent;
+}
+.diaper-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  box-shadow:
+    inset 0 -1px 0 rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.diaper-toggle.active .diaper-toggle-thumb {
+  transform: translateX(24px);
+}
+
+.diaper-toggle-content {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.diaper-toggle-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+.diaper-toggle-helper {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-strong);
+}
+
+
+/* ==========================================================================
+   v2.3 — preset card titles & compact mode (без helper-текста)
+   ========================================================================== */
+
+.preset-card-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  line-height: 1.2;
+}
+
+.preset-card-helper {
+  margin-top: 6px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Когда helper отсутствует — центрируем заголовок и делаем карточку
+   повыше с большим шрифтом, чтобы не выглядела пустой и зажатой */
+.preset-card-compact {
+  min-height: 64px;
+  display: grid;
+  align-content: center;
+  padding: 16px 20px;
+}
+.preset-card-compact .preset-card-title {
+  font-size: 18px;
+}
+
+/* Тоггл «Сменили подгузник» без подзаголовка — центрируем по вертикали */
+.diaper-toggle .diaper-toggle-content { gap: 0; }
+
+
+/* ==========================================================================
+   v3.0 — Home redesign: header, live-status, today digest, quick log
+   ========================================================================== */
+
+/* Тонкий header страницы: имя + возраст + sync-индикатор */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.home-header-left { display: grid; gap: 6px; min-width: 0; }
+.home-header-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.home-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 7vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--text-strong);
+  background: linear-gradient(180deg,
+    var(--text-strong) 30%,
+    color-mix(in srgb, var(--text) 56%, var(--accent)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.home-age-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  color: var(--muted-strong);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--muted-strong);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  flex: 0 0 auto;
+}
+.sync-chip[data-state="conflict"] {
+  border-color: color-mix(in srgb, var(--warn) 36%, transparent);
+  color: var(--warn-text);
+  background: var(--warn-soft);
+}
+.sync-chip[data-state="offline"] {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger-text);
+  background: var(--danger-soft);
+}
+.sync-chip-label { white-space: nowrap; }
+
+/* Live status — главная карточка с текущим состоянием и CTA */
+.live-status-card {
+  display: grid;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 30px) !important;
+  border-radius: var(--radius-xl) !important;
+  isolation: isolate;
+}
+.live-status-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--aurora-1) 16%, transparent), transparent 36%),
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--aurora-3) 16%, transparent), transparent 38%);
+}
+.live-status-card.tone-warm::before {
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--aurora-4) 22%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--aurora-3) 14%, transparent), transparent 42%);
+}
+.live-status-card.tone-calm::before {
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--aurora-3) 22%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--aurora-2) 14%, transparent), transparent 42%);
+}
+.live-status-card.tone-danger::before {
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--danger) 18%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--aurora-4) 14%, transparent), transparent 42%);
+}
+
+.live-status-kicker {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.live-status-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 7vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+  color: var(--text-strong);
+}
+.live-status-body {
+  margin: 0;
+  max-width: 520px;
+  color: var(--muted-strong);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.live-status-cta-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.live-status-cta-row > button { min-height: 52px; }
+.live-status-cta-row > button:first-child { flex: 1 1 220px; }
+
+/* Today digest — горизонтальная сетка чипов */
+.today-chip-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 560px) {
+  .today-chip-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 880px) {
+  .today-chip-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+.today-chip {
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 4px;
+  align-content: start;
+  padding: 14px;
+  min-height: 116px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 50%),
+    color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--inner-highlight);
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
+}
+.today-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 50%),
+    color-mix(in srgb, var(--surface-strong) 84%, transparent);
+}
+.today-chip:active { transform: scale(0.98); }
+.today-chip-icon { font-size: 22px; line-height: 1; }
+.today-chip-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.today-chip-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.35rem, 3.6vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--text-strong);
+}
+.today-chip-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Quick log — главная сетка действий на home */
+.quick-log-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
 @media (min-width: 720px) {
-  .home-focus-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .quick-log-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+.quick-log-tile {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 96px;
+  padding: 14px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--inner-highlight);
+  text-align: center;
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
+}
+.quick-log-tile:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface-strong) 84%, transparent);
+}
+.quick-log-tile:active { transform: scale(0.97); }
+.quick-log-icon { font-size: 26px; line-height: 1; }
+.quick-log-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+/* Меньше отступ между секциями — главная компактнее */
+.dashboard-section { margin-bottom: 18px; }
+
+/* SectionTitle action — пусть ghost-кнопки в action имеют меньший вес */
+.dashboard-section header + .today-chip-grid,
+.dashboard-section header + .quick-log-grid { margin-top: 4px; }
+
+
+/* ==========================================================================
+   v3.1 — Responsive Foundation (Telegram WebApp / Mobile / PC)
+
+   Целевые устройства:
+   • Telegram Mini App (iOS, Android, Telegram Desktop)
+   • iPhone 14 — 390×844 CSS px, notch, home indicator (~34px), safe-area
+   • Poco X6 Pro — ~390 CSS px, без выреза, тонкий нав-индикатор Android
+   • PC — 1280px+, hover, mouse, плотный layout
+
+   Брейкпоинты (mobile-first):
+     base   ≤ 359   маленькие телефоны / Telegram WebK
+     xs     ≥ 360   большинство телефонов в Telegram (iPhone 14, Poco)
+     sm     ≥ 480   крупные телефоны / маленькие планшеты
+     md     ≥ 720   планшеты, iPad mini, узкий desktop
+     lg     ≥ 960   полноразмерный desktop
+     xl     ≥ 1280  широкий desktop
+   ========================================================================== */
+
+/* ---- Telegram & viewport sync ---- */
+:root {
+  /* Используем стабильную высоту Telegram если она пришла; иначе 100dvh */
+  --vh: var(--tg-viewport-stable-height, 100dvh);
+}
+
+html, body {
+  /* Telegram Mini App: высота равна viewport-у клиента, никаких overscroll */
+  min-height: var(--vh);
+}
+
+/* ---- Touch / pointer adaptations ---- */
+@media (pointer: coarse) {
+  /* Гарантируем тапаемые цели ≥ 44pt iOS / 48dp Android */
+  button, [role="button"], .filter-chip, .preset-card, .actor-chip,
+  .quick-log-tile, .today-chip, .feed-card-delete, .quick-delete-button {
+    min-height: 44px;
+  }
+  .filter-chip { min-height: 40px; }
+  .feed-card-delete { width: 38px; height: 38px; }
+  .quick-delete-button { width: 40px; height: 40px; }
+
+  /* На тачах убираем hover-translate (он мерцает при скролле) */
+  .home-focus-grid > div:hover,
+  .stats-grid > div:hover,
+  .timers-grid > div:hover,
+  .metrics-grid > div:hover,
+  .feed-card:hover,
+  .today-chip:hover,
+  .quick-log-tile:hover {
+    transform: none !important;
   }
 
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .actions-grid,
-  .log-primary-grid,
-  .metrics-grid,
-  .timers-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Active feedback на тач — лёгкий scale */
+  .today-chip:active,
+  .quick-log-tile:active,
+  .preset-card:active,
+  .filter-chip:active,
+  .actor-chip:active,
+  .period-tab:active {
+    transform: scale(0.97);
   }
 }
 
-@media (min-width: 1024px) {
-  .dashboard-two-columns {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .export-filter-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .actions-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+@media (pointer: fine) {
+  /* Только мышь — отключаем сглаживание тачей */
+  body { -webkit-tap-highlight-color: transparent; }
 }
 
-@media (max-width: 560px) {
-  .command-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .command-metric {
-    min-height: 108px;
-    border-radius: 20px !important;
-    padding: 12px !important;
-  }
-
-  .command-metric > div > div:nth-child(2) {
-    font-size: 16px !important;
-    line-height: 1.16 !important;
-  }
-
-  .command-metric > div > div:nth-child(3) {
-    display: block;
-    font-size: 12px !important;
-  }
-
-  .growth-summary-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .growth-summary-tile {
-    min-height: 70px;
-    padding: 10px !important;
-    border-radius: 18px !important;
-  }
-
-  .growth-summary-tile strong {
-    font-size: 15px;
-  }
-
-  .growth-panel-grid {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-  }
-
-  .growth-panel {
-    border-radius: 24px !important;
-  }
-}
-
-@media (max-width: 430px) {
-  :root {
-    --bottom-nav-height: 92px;
-  }
-
+/* ---- iPhone notch & home-indicator support ---- */
+@supports (padding: env(safe-area-inset-top)) {
   .page-shell {
-    padding: max(12px, env(safe-area-inset-top))
-      max(10px, env(safe-area-inset-right))
-      calc(var(--bottom-nav-height) + 14px + env(safe-area-inset-bottom))
-      max(10px, env(safe-area-inset-left));
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: calc(
+      var(--bottom-nav-height) + 24px + env(safe-area-inset-bottom)
+    );
   }
-
-  .install-shortcut-card {
-    bottom: calc(var(--bottom-nav-height) + 8px + env(safe-area-inset-bottom));
-    gap: 9px;
-    width: min(calc(100vw - 18px), 560px);
-    padding: 10px;
-    border-radius: 24px;
-  }
-
-  .install-shortcut-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
-    font-size: 20px;
-  }
-
-  .install-shortcut-copy {
-    font-size: 11px;
-  }
-
-  .install-shortcut-primary {
-    min-height: 38px;
-    padding: 0 11px;
-    font-size: 12px;
-  }
-
-  .install-shortcut-dismiss {
-    width: 34px;
-    height: 34px;
-  }
-
   .bottom-tabs-shell {
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 4px);
-    width: min(calc(100vw - 14px), 760px);
-    max-width: calc(100vw - 14px);
-    gap: 3px;
-    padding: 5px;
-    border-radius: 24px;
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 4px) !important;
   }
+}
 
-  .bottom-tab-button {
-    min-height: 52px;
-    border-radius: 19px;
-    padding-inline: 2px;
+/* ---- Высокая плотность пикселей (Poco X6 Pro 1.5x, iPhone 14 3x) ---- */
+@media (min-resolution: 2dppx) {
+  /* Тонкие границы у hairline-элементов на retina */
+  .feed-card, .today-chip, .quick-log-tile, .preset-card, .actor-chip,
+  .filter-chip, .command-metric, .today-stat-mini {
+    border-width: 0.5px;
   }
+}
 
-  .bottom-tab-icon {
-    font-size: 18px;
+/* ===================== BASE ≤ 359px (узкий iPhone SE / Telegram WebK) ==== */
+@media (max-width: 359.98px) {
+  :root {
+    --bottom-nav-height: 78px;
+    --container-max: 100%;
   }
-
-  .bottom-tab-label {
-    font-size: 10px;
+  .page-shell {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
   }
+  .home-title { font-size: 1.85rem; }
+  .live-status-title { font-size: 1.7rem; }
+  .live-status-card { padding: 18px !important; }
+  .today-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .today-chip { min-height: 100px; padding: 12px; }
+  .today-chip-value { font-size: 1.2rem; }
+  .quick-log-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .quick-log-tile { min-height: 84px; padding: 10px 8px; }
+  .quick-log-icon { font-size: 22px; }
+  .home-header { gap: 8px; }
+  .sync-chip-label { display: none; }
+  .sync-chip { padding: 8px; }
+  .bottom-tabs-shell { padding: 4px; }
+  .bottom-tab-button { min-height: 50px; padding: 4px 2px; }
+  .bottom-tab-icon { font-size: 16px; }
+  .bottom-tab-label { font-size: 10px; }
+}
 
-  .dashboard-section {
-    gap: 12px;
-    margin-bottom: 14px;
+/* ===================== xs ≥ 360 (iPhone 14, Poco X6 Pro) ================= */
+@media (min-width: 360px) and (max-width: 479.98px) {
+  :root { --bottom-nav-height: 84px; }
+  .today-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .quick-log-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .home-title { font-size: clamp(2rem, 8vw, 2.4rem); }
+  .live-status-title { font-size: clamp(1.85rem, 7.5vw, 2.4rem); }
+}
+
+/* ===================== sm ≥ 480 (большие телефоны, маленькие планшеты) ==== */
+@media (min-width: 480px) and (max-width: 719.98px) {
+  .today-chip-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .quick-log-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ===================== md ≥ 720 (планшеты, узкий desktop) ================ */
+@media (min-width: 720px) {
+  :root { --bottom-nav-height: 92px; }
+  .today-chip-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .quick-log-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .live-status-cta-row { flex-wrap: nowrap; }
+  .live-status-cta-row > button:first-child { flex: 0 1 320px; }
+  .home-title { font-size: 2.6rem; }
+  .live-status-title { font-size: 2.4rem; }
+  /* Sheet: на планшете центрируем по высоте */
+  .sheet-backdrop { align-items: center; padding-bottom: 24px; }
+}
+
+/* ===================== lg ≥ 960 (полноразмерный desktop) ================= */
+@media (min-width: 960px) {
+  .page-shell {
+    padding-top: 28px;
+    padding-left: clamp(20px, 3vw, 32px);
+    padding-right: clamp(20px, 3vw, 32px);
   }
+  .home-header { margin-bottom: 14px; }
+  .home-title { font-size: 3rem; }
+  .live-status-title { font-size: 2.6rem; }
+  .live-status-body { font-size: 16px; }
+  .feed-list { gap: 18px; }
+  /* Десктоп — две колонки на главной для contented density */
+  .dashboard-two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
-  .hero-title {
-    font-size: clamp(3rem, 18vw, 4.15rem);
-    line-height: 0.94;
-    letter-spacing: -0.052em;
+/* ===================== xl ≥ 1280 (широкий desktop) ======================= */
+@media (min-width: 1280px) {
+  .page-shell { padding-top: 36px; }
+  .quick-log-grid { gap: 14px; }
+  .today-chip { min-height: 124px; padding: 16px; }
+  .today-chip-value { font-size: 1.85rem; }
+  .live-status-card { padding: 36px !important; }
+}
+
+/* ---- Стандартный PWA (на iOS/Android) — корректировка статус-бара ------- */
+@media (display-mode: standalone) {
+  .home-header { padding-top: 4px; }
+}
+
+/* ---- Короткие экраны (landscape мобила, Telegram Desktop в маленьком окне) */
+@media (max-height: 600px) and (orientation: landscape) {
+  :root { --bottom-nav-height: 64px; }
+  .page-shell { padding-top: 8px; }
+  .live-status-card { padding: 16px !important; }
+  .live-status-title { font-size: 1.5rem; line-height: 1; }
+  .live-status-body { font-size: 13px; }
+  .today-chip-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .today-chip { min-height: 88px; padding: 10px; }
+  .today-chip-value { font-size: 1.1rem; }
+  .quick-log-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .quick-log-tile { min-height: 64px; }
+  .bottom-tabs-shell {
+    bottom: calc(max(6px, env(safe-area-inset-bottom)) + 2px) !important;
   }
+}
 
-  .hero-subtitle {
-    font-size: 14px;
+/* ---- Telegram Mini App ограничения ввода (нет horizontal scroll) -------- */
+@media (max-width: 1024px) {
+  .filter-row {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
   }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip { flex: 0 0 auto; scroll-snap-align: start; }
+  .feed-day-header > span:last-child { flex: 0 0 auto; }
+}
 
-  .care-now-card {
-    grid-template-columns: 1fr;
+/* ---- Sheet на маленьких экранах: убираем margin сверху, sheet до верха -- */
+@media (max-width: 479.98px) {
+  .sheet-panel {
+    border-radius: 28px 28px 0 0;
     padding: 16px;
-    border-radius: 24px;
+    max-height: calc(var(--vh) - max(18px, env(safe-area-inset-top)));
   }
+  .sheet-header h3 { font-size: 1.55rem; }
+  .preset-card { padding: 14px 16px; }
+  .preset-card-compact { padding: 14px 18px; min-height: 56px; }
+  .preset-card-title { font-size: 16px; }
+  .preset-card-compact .preset-card-title { font-size: 17px; }
+  .field input { min-height: 52px; font-size: 16px; /* iOS не зумит при 16+ */ }
+  .summary-date-field input { font-size: 16px; }
+  .field-grid { gap: 10px; }
+}
 
-  .command-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+/* ---- Удаляем горизонтальный «вылет» элементов на узких экранах --------- */
+.page-shell, .dashboard-section, .live-status-card, .feed-card, .today-chip {
+  max-width: 100%;
+}
+.feed-card-title, .live-status-title, .home-title {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Скрытие декоративного grid-фона на узких экранах ------------------- */
+@media (max-width: 479.98px) {
+  body::after { display: none; }
+}
+
+/* ---- Мобила landscape короткая: убираем декоративные радиальные слои --- */
+@media (max-height: 500px) {
+  .live-status-card::before { opacity: 0.4; }
+}
+
+/* ---- iPhone 14: компенсация Dynamic Island ------------------------------ */
+@supports (padding-top: env(safe-area-inset-top)) {
+  @media (max-width: 430px) and (max-height: 932px) and (-webkit-device-pixel-ratio: 3) {
+    .page-shell { padding-top: max(12px, env(safe-area-inset-top)); }
   }
+}
 
-  .command-metric {
-    min-height: 106px;
-    border-radius: 20px !important;
-    padding: 12px !important;
-  }
+/* ---- Force GPU compositing for smooth scroll on Telegram Android -------- */
+.bottom-tabs-shell, .live-status-card, .today-chip, .quick-log-tile {
+  will-change: auto;
+  /* will-change: transform могло бы создать stacking context, поэтому НЕ ставим */
+}
 
-  .command-metric > div {
-    gap: 5px !important;
-  }
 
-  .command-metric > div > div:first-child {
-    overflow: hidden;
-    font-size: 12px !important;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+/* ==========================================================================
+   v3.2 — Перенос полезных legacy-правил в новую breakpoint-систему
+   ========================================================================== */
 
-  .command-metric > div > div:nth-child(2) {
-    overflow: visible;
-    font-size: 16px !important;
-    line-height: 1.16 !important;
-  }
-
-  .command-metric > div > div:nth-child(3) {
-    display: block;
-    font-size: 12px !important;
-  }
-
-  .sync-panel {
-    align-items: stretch;
-    border-radius: 22px;
-    flex-direction: column;
-  }
-
-  .sync-panel button {
-    width: 100%;
-  }
-
-  .actor-chip {
-    min-height: 46px;
-    padding: 0 14px;
-  }
-
-  .role-settings-card {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .actor-toggle.compact {
-    justify-content: stretch;
-  }
-
-  .actor-toggle.compact .actor-chip {
-    flex: 1;
-  }
-
-  .theme-switch {
-    width: 100%;
-  }
-
-  .theme-option {
-    flex: 1;
-  }
-
-  .field-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .log-primary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+/* mobile (≤ 720) — узкие экраны */
+@media (max-width: 719.98px) {
   .log-secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .log-secondary-button {
-    min-height: 64px;
-  }
-
-  .export-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .export-hero button {
-    width: 100%;
-  }
-
-  .quick-delete-button {
-    width: 36px;
-    height: 36px;
-    top: 10px;
-    right: 10px;
-  }
-
-  .sheet-backdrop {
-    padding: 10px max(8px, env(safe-area-inset-right))
-      max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-  }
-
-  .sheet-panel {
-    border-radius: 24px 24px 18px 18px;
-    padding: 14px;
-  }
-
-  .sheet-header h3 {
-    font-size: 24px;
-  }
-
-  .feed-card {
-    grid-template-columns: 34px minmax(0, 1fr);
+  .growth-summary-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
-
-  .feed-card-top {
-    align-items: center;
-    flex-direction: row;
+  .growth-panel-grid { grid-template-columns: 1fr; }
+  .export-hero {
+    grid-template-columns: 1fr;
+    /* CTA вниз отдельной строкой */
   }
-
-  .feed-card-top button {
-    flex: 0 0 auto;
+  .export-hero > button {
+    width: 100%;
   }
-
-  .feed-card-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 13px;
-    font-size: 15px;
+  .role-settings-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
   }
+  .feed-card { padding: 12px !important; }
+  .filter-chip { padding: 0 12px; }
+  .period-tabs { padding: 3px; }
+  .period-tab { font-size: 12px; padding: 0 12px; }
+}
+
+/* mobile-narrow (≤ 480) — компактные плотности */
+@media (max-width: 479.98px) {
+  .log-secondary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .log-secondary-button {
+    min-height: 70px;
+    padding: 10px 6px;
+  }
+  .log-secondary-button strong { font-size: 12px; }
+  .feed-card-actions { gap: 4px; }
+  .preset-list { gap: 8px; }
+  .actor-toggle { gap: 8px; }
+  .actor-chip { padding: 0 14px; min-height: 44px; }
+}
+
+/* tablet (≥ 720) — больше колонок, более плотно */
+@media (min-width: 720px) {
+  .log-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .log-secondary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* desktop (≥ 960) */
+@media (min-width: 960px) {
+  .export-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .growth-panel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
+/* ==========================================================================
+   v3.3 — Защита от horizontal overflow в grid-контейнерах
+
+   Card display:grid не задаёт grid-template-columns, и дети с длинным
+   inline-content (Pill, цепочка) растягивают трек до max-content.
+   Заставляем все grid-children имеющие grid-parent усаживаться в minmax(0, 1fr).
+   ========================================================================== */
+
+.export-command-card,
+.live-status-card,
+.today-feeding-card,
+.command-center-card,
+.growth-card {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.export-hero {
+  min-width: 0;
+}
+.export-hero > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Pill-row не должен растягивать родителя, переносится */
+.export-preview-row,
+.live-status-cta-row,
+.feed-card-actions {
+  flex-wrap: wrap;
+}
+
+/* На мобиле Pill-row компактнее */
+@media (max-width: 479.98px) {
+  .export-preview-row { gap: 6px; }
+  .export-preview-row > * { font-size: 12px; padding: 6px 10px; }
+}
+
+
+/* ==========================================================================
+   v3.4 — Универсальная защита grid от max-content раздувания
+   ========================================================================== */
+
+/* Любой потомок grid-родителя должен иметь min-width: 0 чтобы не вылезать */
+.dashboard-section > *,
+.export-filter-grid > *,
+.metrics-grid > *,
+.stats-grid > *,
+.today-chip-grid > *,
+.today-stats-grid > *,
+.today-stats-row > *,
+.quick-log-grid > *,
+.growth-panel-grid > *,
+.field-grid > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Filter-row внутри Surface не должен растягивать родителя */
+.export-filter-grid .filter-row {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+
+/* ==========================================================================
+   v3.5 — Diaper consumption stats (day / week / month)
+   ========================================================================== */
+.diaper-stats-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 359.98px) {
+  .diaper-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+@media (min-width: 720px) {
+  .diaper-stats-grid { gap: 14px; }
+}
+
+.diaper-stat {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 6px;
+  padding: 16px 14px;
+  min-height: 132px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--diaper-accent, var(--accent)) 18%, transparent), transparent 50%),
+    color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: var(--inner-highlight);
+  overflow: hidden;
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
+}
+.diaper-stat[data-tone="day"]   { --diaper-accent: var(--aurora-1); }
+.diaper-stat[data-tone="week"]  { --diaper-accent: var(--aurora-2); }
+.diaper-stat[data-tone="month"] { --diaper-accent: var(--aurora-3); }
+
+@media (hover: hover) {
+  .diaper-stat:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--diaper-accent) 36%, var(--border));
+    background:
+      radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--diaper-accent) 26%, transparent), transparent 50%),
+      color-mix(in srgb, var(--surface-strong) 84%, transparent);
+  }
+}
+.diaper-stat:active { transform: scale(0.98); }
+
+.diaper-stat-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.diaper-stat-period {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+}
+.diaper-stat-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.85rem, 5.2vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--text-strong);
+}
+.diaper-stat-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 359.98px) {
+  .diaper-stat { padding: 12px 10px; min-height: 116px; }
+  .diaper-stat-icon { font-size: 18px; }
+  .diaper-stat-value { font-size: 1.55rem; }
+  .diaper-stat-hint { font-size: 11px; }
+}
+
+
+/* ==========================================================================
+   v3.6 — Статичные карточки на Главной (только для просмотра)
+   ========================================================================== */
+
+.today-chip-static,
+.diaper-stat-static {
+  cursor: default;
+}
+.today-chip-static:hover,
+.diaper-stat-static:hover {
+  transform: none !important;
+  /* Сохраняем оригинальные тона, только убираем интерактивный hover-shift */
+}
+.today-chip-static:active,
+.diaper-stat-static:active {
+  transform: none !important;
+}
+
+/* CTA-row на live-status тоже компактнее, когда только ghost-кнопки */
+.live-status-cta-row {
+  flex-wrap: wrap;
+}
+.live-status-cta-row > button { flex: 0 1 auto; }
+
+
+/* ==========================================================================
+   v3.7 — Growth chart redesign: range-tabs, summary-bar, area-fill, trends
+   ========================================================================== */
+
+/* Tabs «30 д / 3 мес / Всё» в шапке секции «Вес и рост» */
+.growth-range-tabs {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  box-shadow: var(--inner-highlight);
+}
+.growth-range-tab {
+  border: 0;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  transition: background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out);
+}
+.growth-range-tab:hover { color: var(--text-strong); }
+.growth-range-tab.active {
+  background: var(--surface-pressed);
+  color: var(--text-strong);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18),
+              0 6px 14px rgba(0, 0, 0, 0.10);
+}
+
+/* Узкая полоска со сводой над двумя панелями (заменяет 3 дублирующих tile) */
+.growth-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+}
+.growth-summary-stat { display: grid; gap: 2px; }
+.growth-summary-stat-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+}
+.growth-summary-stat-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* Голова панели вес/рост */
+.growth-panel { gap: 14px; padding: 18px !important; }
+.growth-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+.growth-panel-headline {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.growth-panel-value {
+  margin: 0;
+  font-size: clamp(1.7rem, 5.4vw, 2.15rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.growth-panel-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 4px 10px;
+  width: fit-content;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--surface-strong) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.growth-panel-trend.trend-up {
+  color: color-mix(in srgb, var(--good) 90%, var(--text));
+  background: var(--good-soft);
+  border-color: color-mix(in srgb, var(--good) 30%, transparent);
+}
+.growth-panel-trend.trend-down {
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+}
+.growth-panel-trend.trend-neutral { color: var(--muted-strong); }
+.growth-panel-trend-meta {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Min/Max справа */
+.growth-panel-extremes {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.growth-panel-extreme {
+  display: grid;
+  gap: 0;
+}
+.growth-panel-extreme span {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+}
+.growth-panel-extreme strong {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+/* SVG-чарт: больше воздуха, area-fill через linearGradient + currentColor */
+.growth-mini-chart-wrap {
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--bg) 24%, transparent);
+}
+.growth-mini-chart {
+  width: 100%;
+  min-height: 132px;
+  display: block;
+  /* currentColor подставляется в gradient stop */
+  color: var(--growth-accent);
+}
+.growth-mini-chart line { stroke: color-mix(in srgb, var(--border) 50%, transparent); stroke-width: 1; stroke-dasharray: 2 3; }
+.growth-mini-chart polyline {
+  fill: none;
+  stroke: var(--growth-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--growth-accent) 35%, transparent));
+}
+.growth-mini-chart circle {
+  fill: var(--bg);
+  stroke: var(--growth-accent);
+  stroke-width: 2.5;
+}
+
+/* Подпись осей с центральной мета-информацией */
+.growth-axis-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.growth-axis-center {
+  text-align: center;
+  color: var(--muted-strong);
+}
+
+/* Pill «Сейчас: 6.4 кг · 62 см» под двумя панелями */
+.growth-current-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+.growth-current-pill {
+  display: inline-flex;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-1) 14%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  box-shadow: var(--inner-highlight);
+}
+
+/* Удаляем visually-конкурирующий старый growth-summary-row (он скрыт изменением JSX),
+   но если он остался где-то — спрятать */
+.growth-summary-row { display: none; }
+
+/* Адаптация */
+@media (max-width: 559.98px) {
+  .growth-summary-bar { padding: 10px 12px; gap: 12px; }
+  .growth-panel { padding: 14px !important; }
+  .growth-panel-extremes { text-align: right; }
+  .growth-panel-extreme strong { font-size: 12px; }
+  .growth-mini-chart { min-height: 116px; }
+  .growth-axis-row { font-size: 10px; }
+  .growth-axis-center { display: none; }
+  .growth-axis-row { grid-template-columns: auto auto; justify-content: space-between; }
+}
+@media (min-width: 720px) {
+  .growth-mini-chart { min-height: 156px; }
+  .growth-panel { padding: 22px !important; }
+}
+
+
+/* ==========================================================================
+   v3.8 — Современный график веса/роста: smooth curve, tooltip, labels
+   ========================================================================== */
+
+.growth-chart-stage {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--growth-accent) 8%, transparent), transparent 80%),
+    color-mix(in srgb, var(--bg) 28%, transparent);
+  overflow: hidden;
+}
+
+.growth-chart-svg {
+  width: 100%;
+  display: block;
+  min-height: 156px;
+  color: var(--growth-accent);
+  /* allow pointer interactions для tooltip-scrub */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Y-axis text (min / mid / max) */
+.growth-chart-yaxis text {
+  fill: var(--muted);
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* Horizontal grid */
+.growth-chart-grid line {
+  stroke: color-mix(in srgb, var(--border) 60%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+/* Vertical guide для активной точки */
+.growth-chart-guide {
+  stroke: color-mix(in srgb, var(--growth-accent) 50%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  pointer-events: none;
+  animation: growth-fade-in 220ms var(--ease-out) both;
+}
+
+/* Smooth line */
+.growth-chart-line {
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: growth-line-draw 800ms var(--ease-out) both;
+  /* Используется stroke-dasharray анимация, длина пути ~600 px */
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 0;
+}
+
+@keyframes growth-line-draw {
+  from { stroke-dashoffset: 1200; opacity: 0.4; }
+  to   { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* Точки */
+.growth-chart-dot {
+  fill: var(--bg);
+  stroke: var(--growth-accent);
+  stroke-width: 2.5;
+  transition: r var(--dur-2) var(--ease-out);
+  animation: growth-dot-pop 320ms var(--ease-out) both;
+}
+.growth-chart-dot.is-active {
+  fill: var(--growth-accent);
+  stroke: var(--bg);
+}
+
+@keyframes growth-dot-pop {
+  from { transform: scale(0); transform-origin: center; opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* Pulse halo для активной точки */
+.growth-chart-halo {
+  fill: var(--growth-accent);
+  opacity: 0.18;
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: growth-halo 1.8s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+@keyframes growth-halo {
+  0%, 100% { transform: scale(1); opacity: 0.18; }
+  50%      { transform: scale(1.35); opacity: 0; }
+}
+
+/* Tooltip — HTML-нашлёпка над активной точкой */
+.growth-chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated) 95%, transparent);
+  border: 1px solid color-mix(in srgb, var(--growth-accent) 36%, var(--border));
+  box-shadow:
+    var(--inner-highlight),
+    0 12px 28px rgba(0, 0, 0, 0.32);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: blur(14px);
+  animation: growth-tooltip-in 240ms var(--ease-out) both;
+  z-index: 2;
+}
+.growth-chart-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  border-right: inherit;
+  border-bottom: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+@keyframes growth-tooltip-in {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 6px)); }
+  to   { opacity: 1; transform: translate(-50%, calc(-100% - 14px)); }
+}
+.growth-chart-tooltip-value {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.growth-chart-tooltip-date {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Старый growth-mini-chart-wrap — оставляем для обратной совместимости,
+   но новые панели используют growth-chart-stage. */
+
+/* Адаптация под мобилу */
+@media (max-width: 559.98px) {
+  .growth-chart-svg { min-height: 130px; }
+  .growth-chart-tooltip { padding: 6px 10px; }
+  .growth-chart-tooltip-value { font-size: 13px; }
+  .growth-chart-tooltip-date { font-size: 10px; }
+}
+
+@media (min-width: 720px) {
+  .growth-chart-svg { min-height: 184px; }
+}
+
+/* На устройствах с touch — курсор не нужен */
+@media (pointer: coarse) {
+  .growth-chart-svg { cursor: default; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .growth-chart-line { animation: none; stroke-dashoffset: 0 !important; }
+  .growth-chart-dot { animation: none; }
+  .growth-chart-halo { animation: none; }
+  .growth-chart-tooltip { animation: none; }
+}
+
+
+/* ==========================================================================
+   v3.9 — Унифицированная сетка действий + stepper для числовых полей
+   ========================================================================== */
+
+/* Single grid of action tiles (Log tab) */
+.log-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (min-width: 480px) {
+  .log-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 720px) {
+  .log-tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .log-tile-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.log-tile {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 120px;
+  padding: 18px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  box-shadow: var(--inner-highlight), var(--shadow-1);
+  transition: transform var(--dur-1) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+.log-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface-strong) 84%, transparent);
+  box-shadow: var(--inner-highlight), var(--shadow-2);
+}
+.log-tile:active { transform: scale(0.97); }
+.log-tile-icon { font-size: 30px; line-height: 1; }
+.log-tile-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+@media (max-width: 359.98px) {
+  .log-tile { min-height: 104px; padding: 14px 10px; }
+  .log-tile-icon { font-size: 26px; }
+  .log-tile-title { font-size: 13px; }
+}
+
+/* Stepper для числовых полей в форме */
+.stepper-field {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  align-items: stretch;
+  gap: 10px;
+}
+.stepper-input {
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 22px !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  /* убираем родные spin-buttons у number input */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper-btn {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: var(--inner-highlight);
+  transition: transform var(--dur-1) var(--ease-out),
+              background var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out);
+}
+.stepper-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+.stepper-btn:active { transform: scale(0.93); }
+
+
+/* ==========================================================================
+   v3.10 — Цветовые тона для секций «День / Неделя / Месяц»
+   Переопределяем --diaper-accent у плиток в зависимости от категории.
+   ========================================================================== */
+
+.feeding-stat[data-tone="day"]   { --diaper-accent: #67e8f9; } /* кормление: cyan */
+.feeding-stat[data-tone="week"]  { --diaper-accent: #38bdf8; }
+.feeding-stat[data-tone="month"] { --diaper-accent: #a78bfa; }
+
+.sleep-stat[data-tone="day"]   { --diaper-accent: #818cf8; } /* сон: indigo */
+.sleep-stat[data-tone="week"]  { --diaper-accent: #a78bfa; }
+.sleep-stat[data-tone="month"] { --diaper-accent: #c084fc; }
+
+.walk-stat[data-tone="day"]   { --diaper-accent: #6ee7b7; } /* прогулка: emerald */
+.walk-stat[data-tone="week"]  { --diaper-accent: #34d399; }
+.walk-stat[data-tone="month"] { --diaper-accent: #10b981; }
+
+.bath-stat[data-tone="day"]   { --diaper-accent: #93c5fd; } /* купание: sky */
+.bath-stat[data-tone="week"]  { --diaper-accent: #60a5fa; }
+.bath-stat[data-tone="month"] { --diaper-accent: #3b82f6; }
+
+/* На узких экранах помощник может стать многострочным — слегка увеличим line-height */
+.diaper-stat-hint {
+  line-height: 1.4;
+}
+
+
+/* ==========================================================================
+   v3.11 — Feeding period cards (День / Неделя / Месяц с разбивкой)
+   ========================================================================== */
+.feeding-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 720px) {
+  .feeding-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+.feeding-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--feeding-accent, var(--aurora-2)) 26%, var(--border));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--feeding-accent) 20%, transparent), transparent 50%),
+    color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--inner-highlight);
+  overflow: hidden;
+}
+.feeding-card-day   { --feeding-accent: #67e8f9; }
+.feeding-card-week  { --feeding-accent: #38bdf8; }
+.feeding-card-month { --feeding-accent: #a78bfa; }
+
+.feeding-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.feeding-card-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--feeding-accent) 18%, transparent);
+  font-size: 20px;
+  line-height: 1;
+}
+.feeding-card-period {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+}
+.feeding-card-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.55rem, 4.4vw, 1.95rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.feeding-card-count-unit {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.feeding-card-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.feeding-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-strong) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.feeding-row[data-source="breast"]      { --row-color: #f472b6; }
+.feeding-row[data-source="breast-milk"] { --row-color: #34d399; }
+.feeding-row[data-source="formula"]     { --row-color: #fbbf24; }
+
+.feeding-row-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--row-color, var(--accent)) 22%, transparent);
+  font-size: 14px;
+  line-height: 1;
+}
+.feeding-row-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+  min-width: 0;
+}
+.feeding-row-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.feeding-row-unit {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.feeding-row-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Итоговая строка */
+.feeding-row-total {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--feeding-accent) 36%, var(--border));
+  background: color-mix(in srgb, var(--feeding-accent) 10%, transparent);
+}
+.feeding-row-total .feeding-row-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  color: var(--muted);
+}
+.feeding-row-total .feeding-row-value {
+  font-size: 18px;
+  color: var(--text-strong);
+}
+
+.feeding-card-empty {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* На очень узких экранах: иконки + meta компактнее */
+@media (max-width: 359.98px) {
+  .feeding-card { padding: 14px; }
+  .feeding-row { padding: 8px 10px; gap: 8px; }
+  .feeding-row-icon { width: 24px; height: 24px; font-size: 12px; }
+  .feeding-row-meta { display: none; }
+}
+
+
+/* ==========================================================================
+   v3.12 — Period cards для всех категорий (подгузники / сон / прогулка / купание)
+   Подключаемся к feeding-card стилям, переопределяем accent через category-tone.
+   ========================================================================== */
+
+/* Подгузники — оранжево-янтарный → лавандовый */
+.period-diaper-day   { --feeding-accent: #fbbf24; }
+.period-diaper-week  { --feeding-accent: #fb923c; }
+.period-diaper-month { --feeding-accent: #f472b6; }
+
+/* Сон — ночные тона indigo → violet */
+.period-sleep-day   { --feeding-accent: #818cf8; }
+.period-sleep-week  { --feeding-accent: #a78bfa; }
+.period-sleep-month { --feeding-accent: #c084fc; }
+
+/* Прогулки — зелёная гамма */
+.period-walk-day   { --feeding-accent: #6ee7b7; }
+.period-walk-week  { --feeding-accent: #34d399; }
+.period-walk-month { --feeding-accent: #10b981; }
+
+/* Купание — небесная гамма */
+.period-bath-day   { --feeding-accent: #93c5fd; }
+.period-bath-week  { --feeding-accent: #60a5fa; }
+.period-bath-month { --feeding-accent: #3b82f6; }
+
+/* Цвета строк-разбивок */
+.feeding-row[data-source="diaper-wet"]    { --row-color: #fbbf24; }
+.feeding-row[data-source="diaper-dirty"]  { --row-color: #b45309; }
+.feeding-row[data-source="diaper-mixed"]  { --row-color: #f59e0b; }
+.feeding-row[data-source="diaper-check"]  { --row-color: #94a3b8; }
+
+.feeding-row[data-source="sleep-sessions"] { --row-color: #818cf8; }
+.feeding-row[data-source="sleep-avg"]      { --row-color: #a78bfa; }
+.feeding-row[data-source="sleep-per-day"]  { --row-color: #c084fc; }
+
+.feeding-row[data-source="walk-sessions"] { --row-color: #34d399; }
+.feeding-row[data-source="walk-avg"]      { --row-color: #6ee7b7; }
+.feeding-row[data-source="walk-per-day"]  { --row-color: #10b981; }
+
+.feeding-row[data-source="bath-sessions"] { --row-color: #60a5fa; }
+.feeding-row[data-source="bath-avg"]      { --row-color: #93c5fd; }
+
+
+/* ==========================================================================
+   v3.13 — Age card (возраст ребёнка с днями и милестоуном)
+   ========================================================================== */
+
+.home-header {
+  align-items: stretch;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.home-header-left { flex: 1 1 240px; min-width: 0; }
+
+.age-card {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--aurora-2) 28%, var(--border));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--aurora-1) 18%, transparent), transparent 60%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--aurora-3) 16%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface-strong) 84%, transparent);
+  box-shadow: var(--inner-highlight);
+  min-width: 200px;
+}
+
+.age-card-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.age-card-primary {
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 5vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  background: linear-gradient(180deg,
+    var(--text-strong) 30%,
+    color-mix(in srgb, var(--text) 56%, var(--accent)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.age-card-unit {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted-strong);
+  letter-spacing: -0.01em;
+}
+
+.age-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.age-card-days {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  letter-spacing: 0.01em;
+}
+.age-card-milestone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.age-card-milestone strong {
+  color: var(--text-strong);
+  font-weight: 800;
+}
+.age-card-milestone-icon {
+  font-size: 13px;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--aurora-3) 60%, transparent));
+}
+
+/* Адаптация */
+@media (max-width: 559.98px) {
+  .home-header { flex-direction: column; align-items: flex-start; }
+  .age-card { width: 100%; }
+}
+@media (max-width: 359.98px) {
+  .age-card { padding: 12px 14px; }
+  .age-card-primary { font-size: 1.6rem; }
+  .age-card-milestone { display: none; } /* экономим место */
+}
+
+/* Старый age-pill больше не используем — но если где-то остался,
+   стиль не должен висеть тенью */
+.home-age-pill { display: none; }
+
+
+/* ==========================================================================
+   v3.14 — Hero greeting (Доброе утро, Амир)
+   ========================================================================== */
+
+.hero-greeting {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  padding: clamp(22px, 4vw, 34px);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--aurora-2) 24%, var(--border));
+  background:
+    radial-gradient(
+      circle at 8% -10%,
+      color-mix(in srgb, var(--aurora-1) 26%, transparent),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 92% 110%,
+      color-mix(in srgb, var(--aurora-3) 24%, transparent),
+      transparent 44%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--aurora-2) 14%, transparent),
+      transparent 60%
+    ),
+    color-mix(in srgb, var(--surface-strong) 80%, transparent);
+  box-shadow: var(--inner-highlight), var(--shadow-2);
+  isolation: isolate;
+}
+
+/* Лёгкое декоративное свечение справа сверху */
+.hero-greeting::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -30%;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--aurora-2) 32%, transparent),
+    transparent 60%
+  );
+  filter: blur(40px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.hero-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-greeting-kicker {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--muted-strong);
+}
+.hero-greeting-emoji {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(
+    0 4px 12px color-mix(in srgb, var(--aurora-3) 50%, transparent)
+  );
+}
+.hero-greeting-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 9vw, 4.2rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  background: linear-gradient(
+    140deg,
+    var(--text-strong) 20%,
+    color-mix(in srgb, var(--aurora-2) 80%, var(--text)) 60%,
+    color-mix(in srgb, var(--aurora-3) 70%, var(--text))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero-greeting-status {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(14px, 2.8vw, 16px);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--muted-strong);
+  font-variant-numeric: tabular-nums;
+  max-width: 540px;
+  line-height: 1.45;
+}
+
+/* Возрастная плашка теперь идёт отдельной строкой под приветствием */
+.home-meta-row {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.home-meta-row .age-card { flex: 1 1 280px; }
+
+/* Старый home-header теперь не используется — но если где-то остался */
+.home-header { display: none; }
+
+/* Адаптация */
+@media (max-width: 359.98px) {
+  .hero-greeting { padding: 18px; }
+  .hero-greeting-name { font-size: 2.2rem; }
+  .hero-greeting-status { font-size: 13px; }
+  .hero-greeting-emoji { font-size: 18px; }
+}
+@media (min-width: 720px) {
+  .home-meta-row { margin-top: 14px; }
+}
+
+
+/* ==========================================================================
+   v3.15 — Hero greeting v2: одна строка «Привет, Амир»
+   ========================================================================== */
+
+.hero-greeting-line {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px 18px;
+}
+
+.hero-greeting-hi {
+  font-size: clamp(1.35rem, 4vw, 1.85rem);
+  font-weight: 600;
+  color: var(--muted-strong);
+  letter-spacing: -0.01em;
+}
+
+/* Имя — крупное, с aurora-градиентом, лёгкое мерцание для акцента */
+.hero-greeting-line .hero-greeting-name {
+  display: inline-block;
+  font-size: clamp(2.6rem, 9vw, 4.4rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  background:
+    linear-gradient(
+      120deg,
+      var(--text-strong) 0%,
+      color-mix(in srgb, var(--aurora-1) 80%, var(--text)) 35%,
+      color-mix(in srgb, var(--aurora-2) 80%, var(--text)) 60%,
+      color-mix(in srgb, var(--aurora-3) 70%, var(--text)) 100%
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(
+    0 6px 24px color-mix(in srgb, var(--aurora-2) 28%, transparent)
+  );
+}
+
+/* Старые размеры/стили имени-h1 — оставляем как фолбэк, но новая разметка
+   .hero-greeting-line их не использует */
+
+/* На мобиле имя не должно переноситься на новую строку — flex-wrap позволит,
+   только если не помещается. Для очень длинных имён всё ровно — переносится. */
+@media (max-width: 359.98px) {
+  .hero-greeting-line { gap: 6px 12px; }
+}
+
+
+/* ==========================================================================
+   v3.16 — Hero greeting v3 «cinematic»
+   • Тёмная глубокая подложка с aurora-blobs (медленная анимация)
+   • Subtle stars
+   • «Привет,» — рукописный италик, мягкий
+   • Имя — большой geometric с движущимся aurora-shimmer
+   • Тонкий accent-divider под именем
+   ========================================================================== */
+
+/* Перебиваем v3.14/v3.15 */
+.hero-greeting {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 0;
+  padding: clamp(28px, 6vw, 56px) clamp(22px, 5vw, 44px);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--aurora-2) 20%, var(--border));
+  background:
+    linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--bg-elevated) 96%, transparent) 0%,
+      color-mix(in srgb, #0e1118 95%, transparent) 100%
+    );
+  box-shadow:
+    var(--inner-highlight),
+    var(--shadow-3),
+    inset 0 1px 0 color-mix(in srgb, var(--aurora-2) 18%, transparent);
+  min-height: clamp(180px, 32vw, 240px);
+}
+:root[data-theme="light"] .hero-greeting {
+  background:
+    linear-gradient(155deg,
+      #ffffff 0%,
+      color-mix(in srgb, var(--aurora-1) 6%, #f6f8fc) 100%);
+  border-color: color-mix(in srgb, var(--aurora-2) 22%, var(--border));
+}
+
+/* Aurora blobs — медленные плавающие пятна позади текста */
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+  animation: hero-blob-float 18s var(--ease-in-out) infinite;
+}
+.hero-blob-1 {
+  top: -40%; left: -10%;
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--aurora-1) 70%, transparent), transparent 65%);
+  animation-delay: 0s;
+}
+.hero-blob-2 {
+  bottom: -50%; right: -10%;
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--aurora-3) 65%, transparent), transparent 65%);
+  animation-delay: -6s;
+}
+.hero-blob-3 {
+  top: 20%; right: 30%;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--aurora-2) 60%, transparent), transparent 65%);
+  animation-delay: -12s;
+}
+@keyframes hero-blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(20px, -10px) scale(1.06); }
+  66%      { transform: translate(-15px, 12px) scale(0.96); }
+}
+
+/* Stars — субтильные звёздочки */
+.hero-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.hero-star {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-strong) 90%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--text-strong) 40%, transparent);
+  opacity: 0;
+  animation: hero-twinkle 4s var(--ease-in-out) infinite;
+}
+.hero-star-1 { top: 18%; left: 12%; animation-delay: 0s; }
+.hero-star-2 { top: 30%; right: 18%; animation-delay: 1s; width: 3px; height: 3px; }
+.hero-star-3 { top: 70%; left: 22%; animation-delay: 2s; width: 5px; height: 5px; }
+.hero-star-4 { top: 60%; right: 12%; animation-delay: 0.6s; }
+.hero-star-5 { top: 14%; left: 60%; animation-delay: 1.8s; width: 3px; height: 3px; }
+@keyframes hero-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50%      { opacity: 0.85; transform: scale(1); }
+}
+
+/* Контент поверх blobs/stars */
+.hero-content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.hero-hi {
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 2.8vw, 1.35rem);
+  font-weight: 500;
+  font-style: italic;
+  color: color-mix(in srgb, var(--text) 78%, var(--muted));
+  letter-spacing: 0.005em;
+  margin-bottom: 6px;
+  /* eyebrow-like tracking but not uppercase, рукописный фил */
+  opacity: 0;
+  animation: hero-fade-in 700ms var(--ease-out) 100ms forwards;
+}
+
+.hero-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 11vw, 5.6rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.92;
+  /* Для shimmer используем background-clip */
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--aurora-1) 78%, var(--text-strong)) 0%,
+    color-mix(in srgb, var(--aurora-2) 90%, var(--text-strong)) 25%,
+    var(--text-strong) 50%,
+    color-mix(in srgb, var(--aurora-3) 80%, var(--text-strong)) 75%,
+    color-mix(in srgb, var(--aurora-1) 78%, var(--text-strong)) 100%
+  );
+  background-size: 220% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 8px 28px color-mix(in srgb, var(--aurora-2) 30%, transparent));
+  opacity: 0;
+  transform: translateY(8px);
+  animation:
+    hero-fade-up 800ms var(--ease-out) 150ms forwards,
+    hero-shimmer 8s var(--ease-in-out) 1s infinite;
+}
+
+@keyframes hero-fade-in {
+  to { opacity: 1; }
+}
+@keyframes hero-fade-up {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hero-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Тонкая accent-линия после имени */
+.hero-divider {
+  display: block;
+  width: 64px;
+  height: 3px;
+  margin-top: 18px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--aurora-1) 80%, transparent),
+    color-mix(in srgb, var(--aurora-2) 80%, transparent),
+    color-mix(in srgb, var(--aurora-3) 80%, transparent)
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--aurora-2) 50%, transparent);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation:
+    hero-divider-grow 700ms var(--ease-out) 500ms forwards;
+}
+@keyframes hero-divider-grow {
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+/* Cleanup старых стилей */
+.hero-greeting-line, .hero-greeting-hi, .hero-greeting-name,
+.hero-greeting-row, .hero-greeting-kicker, .hero-greeting-emoji,
+.hero-greeting-status { display: none; }
+
+/* Reduced motion — отключаем все анимации */
+@media (prefers-reduced-motion: reduce) {
+  .hero-blob, .hero-star, .hero-name, .hero-hi, .hero-divider {
+    animation: none !important;
+  }
+  .hero-hi, .hero-name { opacity: 1; transform: none; }
+  .hero-divider { opacity: 1; transform: scaleX(1); }
+}
+
+/* Mobile compaction */
+@media (max-width: 359.98px) {
+  .hero-greeting { padding: 24px 18px; }
+  .hero-name { font-size: 2.6rem; }
+  .hero-blob { filter: blur(40px); }
+  .hero-divider { width: 48px; }
 }

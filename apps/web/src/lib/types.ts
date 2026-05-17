@@ -13,6 +13,8 @@ export type CareEventKind =
   | "TEMPERATURE"
   | "MEDICATION"
   | "GROWTH"
+  | "WALK"
+  | "BATH"
   | "NOTE";
 
 export type QuickItemKind = Extract<CareEventKind, "SOLID_FOOD" | "MEDICATION">;
@@ -63,15 +65,25 @@ export interface ReminderCard {
 export interface DailySummary {
   dateLabel: string;
   feedingsCount: number;
+  feedingsTotalMl?: number;
+  feedingsBreastCount?: number;
+  feedingsBottleCount?: number;
+  feedingsBreastMilkBottleCount?: number;
   solidFoodsCount?: number;
   totalSleepMinutes: number;
   averageFeedingIntervalMinutes: number;
+  diaperChangedCount?: number;
+  diaperCheckedOnlyCount?: number;
   diaperWetCount: number;
   diaperDirtyCount: number;
   diaperMixedCount?: number;
   temperatureReadingsCount: number;
   medicationsCount: number;
   growthReadingsCount?: number;
+  walkSessionsCount?: number;
+  totalWalkMinutes?: number;
+  bathSessionsCount?: number;
+  totalBathMinutes?: number;
 }
 
 export type SummaryPeriodId = "1d" | "3d" | "7d" | "30d" | "365d" | "all";

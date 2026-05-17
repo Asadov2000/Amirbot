@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   createDashboardEvent,
+  deleteDashboardEvent,
   updateDashboardEvent,
 } from "@/lib/server/dashboard";
 import {
@@ -65,5 +66,26 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     return safeApiError(error, "Не удалось обновить событие.");
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const actor = resolveRequestActor(request);
+    assertRateLimit(
+      `events:delete:${actor.telegramUserId ?? actor.actor}`,
+      30,
+      60_000,
+    );
+    const payload = await readJsonBody<{ id?: unknown }>(request);
+    if (typeof payload.id !== "string" || payload.id.trim().length === 0) {
+      throw new ApiError("Event id is invalid", 400, "Некорректная запись.");
+    }
+
+    await deleteDashboardEvent(payload.id, actor.actor);
+
+    return NextResponse.json({ ok: true, id: payload.id });
+  } catch (error) {
+    return safeApiError(error, "Не удалось удалить запись.");
   }
 }

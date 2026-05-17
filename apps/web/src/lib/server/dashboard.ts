@@ -27,6 +27,7 @@ const isProduction =
   process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 const allowMockWriteFallback =
   process.env.ENABLE_MOCK_WRITE_FALLBACK === "true";
+const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 
 interface DashboardCreateInput {
   familyId: string;
@@ -198,6 +199,10 @@ function toDashboardEventRecord(
     }
     case "BOTTLE_FEEDING": {
       const volumeMl = event.quantityMl ?? 0;
+      const isBreastMilk = event.feedingSource === "BREAST_MILK";
+      const mode: "BOTTLE" | "BREAST_BOTTLE" = isBreastMilk
+        ? "BREAST_BOTTLE"
+        : "BOTTLE";
 
       return {
         id: event.id,
@@ -207,9 +212,13 @@ function toDashboardEventRecord(
         kind: "FEEDING",
         actor,
         occurredAt: event.occurredAt.toISOString(),
-        summary: event.note?.trim() || `Бутылочка — ${volumeMl} мл`,
+        summary:
+          event.note?.trim() ||
+          (isBreastMilk
+            ? `Грудное молоко в бутылочке — ${volumeMl} мл`
+            : `Бутылочка — ${volumeMl} мл`),
         payload: {
-          mode: "BOTTLE",
+          mode,
           volumeMl,
         },
         status: "COMPLETED",
@@ -246,7 +255,28 @@ function toDashboardEventRecord(
           ? "DIRTY"
           : event.diaperKind === "MIXED"
             ? "MIXED"
-            : "WET";
+            : event.diaperKind === "DRY_CHECK"
+              ? // legacy записи — пытаемся восстановить наблюдение из payload
+                (payload.observed === "DIRTY"
+                  ? "DIRTY"
+                  : payload.observed === "MIXED"
+                    ? "MIXED"
+                    : "WET")
+              : "WET";
+      const changed =
+        event.diaperKind === "DRY_CHECK"
+          ? false
+          : payload.changed === false
+            ? false
+            : true;
+      const verb = changed ? "Сменили подгузник" : "Проверили подгузник";
+      const what =
+        diaperKind === "DIRTY"
+          ? "покакал"
+          : diaperKind === "MIXED"
+            ? "пописал и покакал"
+            : "пописал";
+      const summaryByKind = `${verb} — ${what}`;
 
       return {
         id: event.id,
@@ -256,15 +286,10 @@ function toDashboardEventRecord(
         kind: "DIAPER",
         actor,
         occurredAt: event.occurredAt.toISOString(),
-        summary:
-          event.note?.trim() ||
-          (diaperKind === "DIRTY"
-            ? "Подгузник — покакал"
-            : diaperKind === "MIXED"
-              ? "Подгузник — пописал и покакал"
-              : "Подгузник — пописал"),
+        summary: event.note?.trim() || summaryByKind,
         payload: {
           type: diaperKind,
+          changed,
         },
         status: "LOGGED",
         editedAt:
@@ -324,12 +349,70 @@ function toDashboardEventRecord(
       const dashboardKind =
         payload.dashboardKind === "SOLID_FOOD" ||
         payload.dashboardKind === "GROWTH" ||
+        payload.dashboardKind === "WALK" ||
+        payload.dashboardKind === "BATH" ||
         payload.dashboardKind === "QUICK_ITEM_DELETE"
           ? payload.dashboardKind
           : null;
 
       if (dashboardKind === "QUICK_ITEM_DELETE") {
         return null;
+      }
+
+      if (dashboardKind === "WALK") {
+        const phase = payload.phase === "END" ? "END" : "START";
+        const durationMinutes = Number(payload.durationMinutes ?? 0);
+        return {
+          id: event.id,
+          idempotencyKey: event.idempotencyKey,
+          clientRequestId,
+          revision: event.revision,
+          kind: "WALK",
+          actor,
+          occurredAt: event.occurredAt.toISOString(),
+          summary:
+            event.note?.trim() ||
+            (phase === "START"
+              ? "Прогулка началась"
+              : durationMinutes > 0
+                ? `Прогулка завершена — ${durationMinutes} мин`
+                : "Прогулка завершена"),
+          payload: {
+            ...payload,
+            phase,
+            durationMinutes: durationMinutes || null,
+          },
+          status: phase === "START" ? "STARTED" : "COMPLETED",
+          editedAt:
+            event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+          source: "server",
+        };
+      }
+
+      if (dashboardKind === "BATH") {
+        const durationMinutes = Number(payload.durationMinutes ?? 0);
+        return {
+          id: event.id,
+          idempotencyKey: event.idempotencyKey,
+          clientRequestId,
+          revision: event.revision,
+          kind: "BATH",
+          actor,
+          occurredAt: event.occurredAt.toISOString(),
+          summary:
+            event.note?.trim() ||
+            (durationMinutes > 0
+              ? `Купание — ${durationMinutes} мин`
+              : "Купание"),
+          payload: {
+            ...payload,
+            durationMinutes: durationMinutes || null,
+          },
+          status: "LOGGED",
+          editedAt:
+            event.revision > 1 ? event.updatedAt.toISOString() : undefined,
+          source: "server",
+        };
       }
 
       if (dashboardKind) {
@@ -540,11 +623,18 @@ function toCreateInput(
 
   switch (draft.kind) {
     case "FEEDING":
-      if (draft.payload.mode === "BOTTLE") {
+      if (
+        draft.payload.mode === "BOTTLE" ||
+        draft.payload.mode === "BREAST_BOTTLE"
+      ) {
         return {
           ...baseInput,
           type: "BOTTLE_FEEDING" as const,
           quantityMl: toNumber(draft.payload.volumeMl) ?? 0,
+          feedingSource:
+            draft.payload.mode === "BREAST_BOTTLE"
+              ? ("BREAST_MILK" as const)
+              : ("FORMULA" as const),
           note: draft.summary,
         };
       }
@@ -585,6 +675,10 @@ function toCreateInput(
               ? ("MIXED" as const)
               : ("WET" as const),
         note: draft.summary,
+        payload: {
+          ...draft.payload,
+          changed: draft.payload.changed === false ? false : true,
+        },
       };
     case "TEMPERATURE":
       return {
@@ -625,6 +719,29 @@ function toCreateInput(
         payload: {
           ...draft.payload,
           dashboardKind: "GROWTH",
+        },
+      };
+    case "WALK": {
+      const phase = draft.payload.phase === "END" ? "END" : "START";
+      return {
+        ...baseInput,
+        type: "NOTE" as const,
+        note: draft.summary,
+        payload: {
+          ...draft.payload,
+          dashboardKind: "WALK",
+          phase,
+        },
+      };
+    }
+    case "BATH":
+      return {
+        ...baseInput,
+        type: "NOTE" as const,
+        note: draft.summary,
+        payload: {
+          ...draft.payload,
+          dashboardKind: "BATH",
         },
       };
     case "NOTE":
@@ -730,6 +847,10 @@ function buildEventsSyncState(events: Array<{ id: string; updatedAt: Date }>) {
 }
 
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+  if (!hasDatabase && !isProduction) {
+    return createBaseSnapshot();
+  }
+
   try {
     return await retryDashboardDb("dashboard snapshot", async () => {
       const context = await ensureDefaultFamilyContext();
@@ -773,6 +894,15 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
 }
 
 export async function getDashboardSyncState() {
+  if (!hasDatabase && !isProduction) {
+    return {
+      ok: true,
+      syncVersion: "local-mock",
+      lastSyncedAt: new Date().toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   try {
     return await retryDashboardDb("sync state", async () => {
       const context = await ensureDefaultFamilyContext();
@@ -971,5 +1101,43 @@ export async function updateDashboardEvent(
       id,
       editedAt: new Date().toISOString(),
     };
+  }
+}
+
+export async function deleteDashboardEvent(
+  id: string,
+  actor: ActorId,
+): Promise<{ ok: true; id: string }> {
+  if (!hasDatabase && !isProduction) {
+    // local mock — нечего удалять, просто возвращаем ok
+    return { ok: true, id };
+  }
+
+  try {
+    const context = await ensureDefaultFamilyContext();
+    const result = await careEventRepository.softDelete({
+      id,
+      familyId: context.familyId,
+      deletedByUserId: context.actors[actor].userId,
+    });
+
+    if (!result) {
+      throw new ApiError(
+        "CareEvent not found",
+        404,
+        "Запись уже удалена или не найдена.",
+      );
+    }
+
+    return { ok: true, id };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    logServerFallback("Falling back to mock event delete", error);
+    if (isProduction || !allowMockWriteFallback) {
+      throw error;
+    }
+    return { ok: true, id };
   }
 }

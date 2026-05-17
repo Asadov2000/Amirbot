@@ -52,10 +52,12 @@ function periodStart(days: number | null): number {
     return Number.NEGATIVE_INFINITY;
   }
 
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  start.setDate(start.getDate() - days + 1);
-  return start.getTime();
+  // Якорь по Москве: смена «дня» в 00:00 MSK, не от локального полуночного.
+  const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const moscowNow = Date.now() + MOSCOW_OFFSET_MS;
+  const moscowDayStartUTC =
+    Math.floor(moscowNow / 86_400_000) * 86_400_000 - MOSCOW_OFFSET_MS;
+  return moscowDayStartUTC - (days - 1) * 86_400_000;
 }
 
 function getSummary(
@@ -118,12 +120,42 @@ function getSummary(
     );
   }
 
+  const walkEvents = periodEvents.filter((event) => event.kind === "WALK");
+  const bathEvents = periodEvents.filter((event) => event.kind === "BATH");
+  const totalWalkMinutes = sumPairedMinutes(walkEvents);
+  const totalBathMinutes = bathEvents.reduce(
+    (sum, event) => sum + Math.max(0, Number(event.payload.durationMinutes ?? 0)),
+    0,
+  );
+  const feedingsTotalMl = feedingEvents.reduce((sum, event) => {
+    const volume = Number(event.payload.volumeMl ?? 0);
+    return sum + (Number.isFinite(volume) ? volume : 0);
+  }, 0);
+  const breastFeedingCount = feedingEvents.filter(
+    (event) => event.payload.mode === "BREAST",
+  ).length;
+  const bottleFeedingCount = feedingEvents.filter(
+    (event) =>
+      event.payload.mode === "BOTTLE" || event.payload.mode === "BREAST_BOTTLE",
+  ).length;
+  const breastMilkBottleCount = feedingEvents.filter(
+    (event) => event.payload.mode === "BREAST_BOTTLE",
+  ).length;
+  const diaperChangedCount = diaperEvents.filter(
+    (event) => event.payload.changed !== false,
+  ).length;
+  const diaperCheckedOnlyCount = diaperEvents.length - diaperChangedCount;
+
   return {
     dateLabel: new Intl.DateTimeFormat("ru-RU", {
       day: "numeric",
       month: "long",
     }).format(new Date()),
     feedingsCount: feedingEvents.length,
+    feedingsTotalMl: Math.round(feedingsTotalMl),
+    feedingsBreastCount: breastFeedingCount,
+    feedingsBottleCount: bottleFeedingCount,
+    feedingsBreastMilkBottleCount: breastMilkBottleCount,
     solidFoodsCount: periodEvents.filter((event) => event.kind === "SOLID_FOOD")
       .length,
     totalSleepMinutes,
@@ -131,6 +163,8 @@ function getSummary(
       feedingEvents.length > 1
         ? Math.round(intervalSum / (feedingEvents.length - 1))
         : 0,
+    diaperChangedCount,
+    diaperCheckedOnlyCount,
     diaperWetCount: diaperEvents.filter((event) => event.payload.type === "WET")
       .length,
     diaperDirtyCount: diaperEvents.filter(
@@ -147,7 +181,66 @@ function getSummary(
     ).length,
     growthReadingsCount: periodEvents.filter((event) => event.kind === "GROWTH")
       .length,
+    walkSessionsCount: walkEvents.filter(
+      (event) => event.payload.phase === "END",
+    ).length,
+    totalWalkMinutes,
+    bathSessionsCount: bathEvents.length,
+    totalBathMinutes,
   };
+}
+
+/** Суммирует минуты между парами START/END (для прогулки/сна и т.п.). */
+function sumPairedMinutes(events: CareEventRecord[]): number {
+  const starts = events
+    .filter((event) => event.payload.phase === "START")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+  const ends = events
+    .filter((event) => event.payload.phase === "END")
+    .sort(
+      (left, right) =>
+        new Date(left.occurredAt).getTime() -
+        new Date(right.occurredAt).getTime(),
+    );
+
+  let total = 0;
+  starts.forEach((start, index) => {
+    const end = ends[index];
+    if (!end) {
+      // незавершённая сессия — считаем до сейчас
+      total += Math.max(
+        0,
+        Math.round((Date.now() - new Date(start.occurredAt).getTime()) / 60000),
+      );
+      return;
+    }
+    total += Math.max(
+      0,
+      Math.round(
+        (new Date(end.occurredAt).getTime() -
+          new Date(start.occurredAt).getTime()) /
+          60000,
+      ),
+    );
+  });
+
+  // События с уже посчитанной длительностью (например, ручной ввод)
+  events
+    .filter(
+      (event) =>
+        event.payload.phase !== "START" &&
+        event.payload.phase !== "END" &&
+        Number(event.payload.durationMinutes ?? 0) > 0,
+    )
+    .forEach((event) => {
+      total += Math.max(0, Number(event.payload.durationMinutes ?? 0));
+    });
+
+  return total;
 }
 
 function getPeriodSummaries(events: CareEventRecord[]): PeriodSummary[] {
