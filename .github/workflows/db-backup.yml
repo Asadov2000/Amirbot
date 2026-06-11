@@ -1,0 +1,72 @@
+name: DB Backup
+
+# Ежедневный зашифрованный бэкап продакшен-базы PostgreSQL.
+# Требуются secrets репозитория (Settings → Secrets and variables → Actions):
+#   DATABASE_URL      — полная строка подключения к продакшен-базе (postgresql://...?sslmode=require)
+#   BACKUP_PASSPHRASE — длинная случайная фраза для шифрования дампа (репозиторий публичный!)
+# Восстановление: см. docs/BACKUP.md
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # 04:00 по Москве, ежедневно
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check configuration
+        id: check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::Секреты DATABASE_URL и/или BACKUP_PASSPHRASE не заданы — бэкап пропущен. Добавьте их в Settings → Secrets and variables → Actions."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install PostgreSQL 18 client
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+
+      - name: Dump database
+        if: steps.check.outputs.skip != 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file=amir-db.dump
+          ls -la amir-db.dump
+
+      - name: Encrypt dump
+        if: steps.check.outputs.skip != 'true'
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in amir-db.dump \
+            -out "amir-db-$(date -u +%Y-%m-%d).dump.enc" \
+            -pass env:BACKUP_PASSPHRASE
+          rm amir-db.dump
+          ls -la ./*.dump.enc
+
+      - name: Upload backup artifact
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: "*.dump.enc"
+          retention-days: 90
+          if-no-files-found: error
